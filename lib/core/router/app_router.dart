@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/conversation/screens/conversation_screen.dart';
+import '../../features/history/screens/history_screen.dart';
 import '../../features/home/screens/home_screen.dart';
 import '../../features/onboarding/screens/onboarding_screen.dart';
 import '../../features/progress/screens/progress_screen.dart';
@@ -53,6 +54,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const VocabularyScreen(),
           ),
           GoRoute(
+            path: '/history',
+            builder: (context, state) => const HistoryScreen(),
+          ),
+          GoRoute(
             path: '/settings',
             builder: (context, state) => const SettingsScreen(),
           ),
@@ -80,6 +85,7 @@ class AppShell extends StatelessWidget {
       String p when p.startsWith('/topics') => 1,
       String p when p.startsWith('/progress') => 2,
       String p when p.startsWith('/vocabulary') => 3,
+      String p when p.startsWith('/history') => 3,
       String p when p.startsWith('/settings') => 4,
       _ => 0,
     };
@@ -130,10 +136,10 @@ class _FloatingDock extends StatelessWidget {
       Icons.headphones_rounded,
       Icons.search_rounded,
       Icons.insert_chart_outlined_rounded,
-      Icons.person_outline_rounded,
+      Icons.rate_review_rounded,
       Icons.settings_rounded,
     ];
-    const labels = ['Home', 'Topics', 'Progress', 'Vocab', 'Settings'];
+    const labels = ['Home', 'Topics', 'Progress', 'Review', 'Settings'];
 
     return Center(
       child: Container(

@@ -18,4 +18,32 @@ class Message {
   final List<GrammarCorrection> corrections;
 
   bool get isUser => role == MessageRole.user;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'role': role.name,
+        'text': text,
+        'createdAt': createdAt.toIso8601String(),
+        'corrections': corrections.map((item) => item.toJson()).toList(),
+      };
+
+  factory Message.fromJson(Map<dynamic, dynamic> json) {
+    final roleName = json['role']?.toString() ?? MessageRole.assistant.name;
+    return Message(
+      id: json['id']?.toString() ?? '',
+      role: MessageRole.values.firstWhere(
+        (item) => item.name == roleName,
+        orElse: () => MessageRole.assistant,
+      ),
+      text: json['text']?.toString() ?? '',
+      createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
+          DateTime.now(),
+      corrections: (json['corrections'] as List?)
+              ?.whereType<Map>()
+              .map((item) =>
+                  GrammarCorrection.fromJson(Map<String, dynamic>.from(item)))
+              .toList() ??
+          const [],
+    );
+  }
 }

@@ -13,11 +13,15 @@ class LlmResponse {
   const LlmResponse({
     required this.text,
     this.provider = 'demo',
+    this.model = 'local',
+    this.estimatedTokens = 0,
     this.corrections = const [],
   });
 
   final String text;
   final String provider;
+  final String model;
+  final int estimatedTokens;
   final List<GrammarCorrection> corrections;
 }
 
@@ -43,7 +47,7 @@ class LlmRouterService {
     );
     final openAiMessages = [
       {'role': 'system', 'content': systemPrompt},
-      ...history.take(12).map((message) => {
+      ...history.reversed.take(6).toList().reversed.map((message) => {
             'role': message.isUser ? 'user' : 'assistant',
             'content': message.text,
           }),
@@ -91,23 +95,87 @@ class LlmRouterService {
         final raw = provider.isGemini
             ? await _sendGemini(provider, systemPrompt, history, userText)
             : await _sendOpenAiCompatible(provider, openAiMessages);
-        return _parseResponse(raw, provider.id);
+        return _parseResponse(
+          raw,
+          provider.id,
+          provider.model,
+          _estimateTokens(openAiMessages, raw),
+        );
       } on DioException catch (error) {
         final status = error.response?.statusCode ?? 0;
         if (status == 429 || status >= 500) {
-          _cooldowns[provider.id] = DateTime.now().add(const Duration(seconds: 60));
+          _cooldowns[provider.id] =
+              DateTime.now().add(const Duration(seconds: 60));
           continue;
         }
-      } catch (_) {
-      }
+      } catch (_) {}
     }
 
     final demo = _demoResponse(topic, userText);
     return LlmResponse(
-      text: '${demo.text} I could not reach the configured AI providers, so this is a local practice reply.',
+      text:
+          '${demo.text} I could not reach the configured AI providers, so this is a local practice reply.',
       provider: 'fallback',
+      model: 'local',
       corrections: demo.corrections,
     );
+  }
+
+  Future<String?> validateProvider({
+    required String provider,
+    required String apiKey,
+  }) async {
+    if (apiKey.trim().isEmpty) return 'API key is empty.';
+    try {
+      final config = switch (provider) {
+        'groq' => _ProviderConfig(
+            id: 'groq',
+            apiKey: apiKey,
+            baseUrl: 'https://api.groq.com/openai/v1',
+            model: 'llama-3.3-70b-versatile',
+          ),
+        'cerebras' => _ProviderConfig(
+            id: 'cerebras',
+            apiKey: apiKey,
+            baseUrl: 'https://api.cerebras.ai/v1',
+            model: 'qwen-3-235b-instruct',
+          ),
+        'sambanova' => _ProviderConfig(
+            id: 'sambanova',
+            apiKey: apiKey,
+            baseUrl: 'https://api.sambanova.ai/v1',
+            model: 'Meta-Llama-3.3-70B-Instruct',
+          ),
+        'gemini' => _ProviderConfig(
+            id: 'gemini',
+            apiKey: apiKey,
+            baseUrl: '',
+            model: 'gemini-2.0-flash',
+            isGemini: true,
+          ),
+        'openrouter' => _ProviderConfig(
+            id: 'openrouter',
+            apiKey: apiKey,
+            baseUrl: 'https://openrouter.ai/api/v1',
+            model: 'openrouter/free',
+            headers: {'HTTP-Referer': 'https://eloq.app'},
+          ),
+        _ => null,
+      };
+      if (config == null) return 'Unknown provider.';
+      if (config.isGemini) {
+        await _sendGemini(config, 'Reply with OK.', const [], 'OK');
+      } else {
+        await _sendOpenAiCompatible(config, const [
+          {'role': 'user', 'content': 'Reply with OK.'},
+        ]);
+      }
+      return null;
+    } on DioException catch (error) {
+      return error.response?.data?.toString() ?? error.message;
+    } catch (error) {
+      return error.toString();
+    }
   }
 
   Future<String> _sendOpenAiCompatible(
@@ -143,8 +211,9 @@ class LlmRouterService {
     String userText,
   ) async {
     final transcript = StringBuffer(systemPrompt);
-    for (final message in history.take(12)) {
-      transcript.writeln('${message.isUser ? 'Student' : 'Eloq'}: ${message.text}');
+    for (final message in history.reversed.take(6).toList().reversed) {
+      transcript
+          .writeln('${message.isUser ? 'Student' : 'Eloq'}: ${message.text}');
     }
     transcript.writeln('Student: $userText');
 
@@ -167,13 +236,23 @@ class LlmRouterService {
         'I am here. Could you say that again?';
   }
 
-  LlmResponse _parseResponse(String raw, String provider) {
+  LlmResponse _parseResponse(
+    String raw,
+    String provider,
+    String model,
+    int estimatedTokens,
+  ) {
     const start = '|||CORRECTIONS|||';
     const end = '|||END|||';
     final startIndex = raw.indexOf(start);
     final endIndex = raw.indexOf(end);
     if (startIndex == -1 || endIndex == -1 || endIndex <= startIndex) {
-      return LlmResponse(text: raw.trim(), provider: provider);
+      return LlmResponse(
+        text: raw.trim(),
+        provider: provider,
+        model: model,
+        estimatedTokens: estimatedTokens,
+      );
     }
 
     final spokenText = raw.substring(0, startIndex).trim();
@@ -182,13 +261,16 @@ class LlmRouterService {
     final corrections = decoded is List
         ? decoded
             .whereType<Map>()
-            .map((item) => GrammarCorrection.fromJson(Map<String, dynamic>.from(item)))
+            .map((item) =>
+                GrammarCorrection.fromJson(Map<String, dynamic>.from(item)))
             .toList()
         : <GrammarCorrection>[];
 
     return LlmResponse(
       text: spokenText,
       provider: provider,
+      model: model,
+      estimatedTokens: estimatedTokens,
       corrections: corrections,
     );
   }
@@ -209,16 +291,26 @@ class LlmRouterService {
       text:
           'Nice. Let us practice ${topic.name.toLowerCase()}. ${topic.prompt} What would you like to say next?',
       provider: 'demo',
+      model: 'local',
+      estimatedTokens: 0,
       corrections: hasWant
           ? const [
               GrammarCorrection(
                 original: 'I want',
                 corrected: "I'd like",
-                explanation: "I'd like sounds more polite in service situations.",
+                explanation:
+                    "I'd like sounds more polite in service situations.",
               ),
             ]
           : const [],
     );
+  }
+
+  int _estimateTokens(List<Map<String, String>> messages, String response) {
+    final chars = response.length +
+        messages.fold<int>(
+            0, (sum, item) => sum + (item['content']?.length ?? 0));
+    return (chars / 4).ceil().clamp(1, 100000);
   }
 }
 

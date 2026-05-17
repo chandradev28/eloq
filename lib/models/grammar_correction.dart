@@ -16,4 +16,10 @@ class GrammarCorrection {
       explanation: json['explanation']?.toString() ?? '',
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'original': original,
+        'corrected': corrected,
+        'explanation': explanation,
+      };
 }

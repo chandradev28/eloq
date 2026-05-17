@@ -13,6 +13,7 @@ class AppSettings {
     this.accent = 'US',
     this.isDarkMode = false,
     this.hasCompletedOnboarding = false,
+    this.dailyGoalMinutes = 10,
   });
 
   final String groqApiKey;
@@ -28,6 +29,7 @@ class AppSettings {
   final String accent;
   final bool isDarkMode;
   final bool hasCompletedOnboarding;
+  final int dailyGoalMinutes;
 
   bool get hasGroqKey => groqApiKey.trim().isNotEmpty;
   bool get hasAnyLlmKey =>
@@ -51,6 +53,7 @@ class AppSettings {
     String? accent,
     bool? isDarkMode,
     bool? hasCompletedOnboarding,
+    int? dailyGoalMinutes,
   }) {
     return AppSettings(
       groqApiKey: groqApiKey ?? this.groqApiKey,
@@ -67,6 +70,7 @@ class AppSettings {
       isDarkMode: isDarkMode ?? this.isDarkMode,
       hasCompletedOnboarding:
           hasCompletedOnboarding ?? this.hasCompletedOnboarding,
+      dailyGoalMinutes: dailyGoalMinutes ?? this.dailyGoalMinutes,
     );
   }
 
@@ -78,6 +82,7 @@ class AppSettings {
         'accent': accent,
         'isDarkMode': isDarkMode,
         'hasCompletedOnboarding': hasCompletedOnboarding,
+        'dailyGoalMinutes': dailyGoalMinutes,
       };
 
   factory AppSettings.fromJson(Map<dynamic, dynamic> json) {
@@ -89,6 +94,7 @@ class AppSettings {
       accent: json['accent']?.toString() ?? 'US',
       isDarkMode: json['isDarkMode'] == true,
       hasCompletedOnboarding: json['hasCompletedOnboarding'] == true,
+      dailyGoalMinutes: (json['dailyGoalMinutes'] as num?)?.toInt() ?? 10,
     );
   }
 }

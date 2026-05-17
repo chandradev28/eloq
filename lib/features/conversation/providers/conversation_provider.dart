@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/constants/topics.dart';
 import '../../../features/settings/providers/settings_provider.dart';
+import '../../../models/conversation_session.dart';
 import '../../../services/audio_recorder_service.dart';
 import '../../../services/llm_router_service.dart';
 import '../../../services/tts_service.dart';
@@ -61,7 +62,9 @@ class ConversationController extends StateNotifier<ConversationState> {
 
   final Ref ref;
   final _uuid = const Uuid();
+  late final String _sessionId = _uuid.v4();
   final DateTime _startedAt = DateTime.now();
+  DateTime? _recordingStartedAt;
   bool _sessionCounted = false;
 
   Future<void> toggleRecording() async {
@@ -82,6 +85,7 @@ class ConversationController extends StateNotifier<ConversationState> {
     }
 
     final path = await recorder.start();
+    _recordingStartedAt = DateTime.now();
     state = state.copyWith(
       isRecording: true,
       currentAudioPath: path,
@@ -109,6 +113,17 @@ class ConversationController extends StateNotifier<ConversationState> {
               .read(whisperServiceProvider)
               .transcribe(apiKey: settings.groqApiKey, filePath: path)
           : 'I want to practice speaking English.';
+      if (settings.hasGroqKey) {
+        final seconds = DateTime.now()
+            .difference(_recordingStartedAt ?? DateTime.now())
+            .inSeconds
+            .clamp(1, 3600);
+        await ref.read(usageProvider.notifier).trackAudio(
+              provider: 'groq',
+              model: 'whisper-large-v3-turbo',
+              seconds: seconds,
+            );
+      }
       await sendText(text);
     } catch (error) {
       state = state.copyWith(error: error.toString());
@@ -154,10 +169,18 @@ class ConversationController extends StateNotifier<ConversationState> {
         messages: [...state.messages, assistantMessage],
         isThinking: false,
       );
+      if (response.provider != 'demo' && response.provider != 'fallback') {
+        await ref.read(usageProvider.notifier).trackChat(
+              provider: response.provider,
+              model: response.model,
+              estimatedTokens: response.estimatedTokens,
+            );
+      }
       await ref.read(progressProvider.notifier).addMessageXp(
             corrections: response.corrections.length,
           );
       await _countSessionOnce();
+      await _saveSession(response.provider);
       await ref
           .read(ttsServiceProvider)
           .speak(response.text, speed: settings.speakingSpeed);
@@ -197,10 +220,26 @@ class ConversationController extends StateNotifier<ConversationState> {
   Future<void> _countSessionOnce() async {
     if (_sessionCounted) return;
     _sessionCounted = true;
-    final minutesPracticed = DateTime.now().difference(_startedAt).inMinutes;
+    final secondsPracticed =
+        DateTime.now().difference(_startedAt).inSeconds.clamp(1, 7200);
+    final minutesPracticed = ((secondsPracticed + 59) ~/ 60).clamp(1, 120);
     await ref
         .read(progressProvider.notifier)
         .completeConversation(minutesPracticed: minutesPracticed);
+  }
+
+  Future<void> _saveSession(String provider) async {
+    final topic = Topics.byId(state.topicId);
+    final session = ConversationSession(
+      id: _sessionId,
+      topicId: topic.id,
+      topicName: topic.name,
+      startedAt: _startedAt,
+      updatedAt: DateTime.now(),
+      messages: state.messages,
+      provider: provider,
+    );
+    await ref.read(historyProvider.notifier).upsert(session);
   }
 }
 

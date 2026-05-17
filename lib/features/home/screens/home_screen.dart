@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../models/conversation_session.dart';
 import '../../settings/providers/settings_provider.dart';
 import '../widgets/topic_grid.dart';
 
@@ -13,6 +14,7 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
     final progress = ref.watch(progressProvider);
+    final sessions = ref.watch(historyProvider);
     final hours = (progress.minutesPracticed / 60).clamp(0, 99).toDouble();
     final shownHours = hours.toStringAsFixed(1);
 
@@ -90,6 +92,11 @@ class HomeScreen extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 18),
+                  _DailyGoalCard(
+                    practiced: progress.todayMinutesPracticed,
+                    goal: settings.dailyGoalMinutes,
+                  ),
+                  const SizedBox(height: 16),
                   _StripedPracticeCard(
                     title: 'Speaking Practice',
                     subtitle: '${progress.minutesPracticed} minutes practiced',
@@ -122,13 +129,78 @@ class HomeScreen extends ConsumerWidget {
                           fontWeight: FontWeight.w900,
                         ),
                   ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () => context.go('/history'),
+                      icon: const Icon(Icons.history_rounded),
+                      label: const Text('View all history'),
+                    ),
+                  ),
                   const SizedBox(height: 12),
-                  const _EmptyRecent(),
+                  if (sessions.isEmpty)
+                    const _EmptyRecent()
+                  else
+                    for (final session in sessions.take(3)) ...[
+                      _RecentSessionCard(session: session),
+                      const SizedBox(height: 10),
+                    ],
                 ],
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _DailyGoalCard extends StatelessWidget {
+  const _DailyGoalCard({
+    required this.practiced,
+    required this.goal,
+  });
+
+  final int practiced;
+  final int goal;
+
+  @override
+  Widget build(BuildContext context) {
+    final progress =
+        goal == 0 ? 0.0 : (practiced / goal).clamp(0, 1).toDouble();
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.surface(context),
+        borderRadius: BorderRadius.circular(26),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'Today',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+              ),
+              const Spacer(),
+              Text(
+                '$practiced / $goal min',
+                style: const TextStyle(
+                  color: AppColors.accentPurple,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(minHeight: 8, value: progress),
+          ),
+        ],
       ),
     );
   }
@@ -642,6 +714,71 @@ class _EmptyRecent extends StatelessWidget {
       child: Text(
         'Your first sessions will appear here.',
         style: TextStyle(color: AppColors.secondaryText(context)),
+      ),
+    );
+  }
+}
+
+class _RecentSessionCard extends StatelessWidget {
+  const _RecentSessionCard({required this.session});
+
+  final ConversationSession session;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface(context),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: AppColors.softSurface(context),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.forum_rounded,
+              color: AppColors.accentPurple,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  session.topicName,
+                  style: TextStyle(
+                    color: AppColors.primaryText(context),
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${session.userTurns} turns - ${session.correctionCount} corrections',
+                  style: TextStyle(
+                    color: AppColors.secondaryText(context),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            session.provider,
+            style: const TextStyle(
+              color: AppColors.accentPurple,
+              fontWeight: FontWeight.w800,
+              fontSize: 12,
+            ),
+          ),
+        ],
       ),
     );
   }

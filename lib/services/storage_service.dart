@@ -2,7 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
+import '../models/api_usage.dart';
 import '../models/app_settings.dart';
+import '../models/conversation_session.dart';
 import '../models/user_progress.dart';
 
 class StorageService {
@@ -12,8 +14,11 @@ class StorageService {
 
   static const _settingsBoxName = 'eloq_settings';
   static const _progressBoxName = 'eloq_progress';
+  static const _usageBoxName = 'eloq_usage';
+  static const _historyBoxName = 'eloq_history';
   static const _settingsKey = 'settings';
   static const _progressKey = 'progress';
+  static const _usageKey = 'usage';
 
   final FlutterSecureStorage _secureStorage;
 
@@ -21,14 +26,17 @@ class StorageService {
     try {
       final box = await Hive.openBox(_settingsBoxName);
       final stored = box.get(_settingsKey);
-      final base = stored is Map ? AppSettings.fromJson(stored) : const AppSettings();
+      final base =
+          stored is Map ? AppSettings.fromJson(stored) : const AppSettings();
 
       return base.copyWith(
         groqApiKey: await _secureStorage.read(key: 'groqApiKey') ?? '',
         cerebrasApiKey: await _secureStorage.read(key: 'cerebrasApiKey') ?? '',
-        sambanovaApiKey: await _secureStorage.read(key: 'sambanovaApiKey') ?? '',
+        sambanovaApiKey:
+            await _secureStorage.read(key: 'sambanovaApiKey') ?? '',
         geminiApiKey: await _secureStorage.read(key: 'geminiApiKey') ?? '',
-        openRouterApiKey: await _secureStorage.read(key: 'openRouterApiKey') ?? '',
+        openRouterApiKey:
+            await _secureStorage.read(key: 'openRouterApiKey') ?? '',
         xaiApiKey: await _secureStorage.read(key: 'xaiApiKey') ?? '',
       );
     } catch (_) {
@@ -51,7 +59,9 @@ class StorageService {
     try {
       final box = await Hive.openBox(_progressBoxName);
       final stored = box.get(_progressKey);
-      return stored is Map ? UserProgress.fromJson(stored) : const UserProgress();
+      return stored is Map
+          ? UserProgress.fromJson(stored)
+          : const UserProgress();
     } catch (_) {
       return const UserProgress();
     }
@@ -62,8 +72,45 @@ class StorageService {
     await box.put(_progressKey, progress.toJson());
   }
 
+  Future<ApiUsage> readUsage() async {
+    try {
+      final box = await Hive.openBox(_usageBoxName);
+      final stored = box.get(_usageKey);
+      return stored is Map
+          ? ApiUsage.fromJson(stored)
+          : ApiUsage(dateKey: ApiUsage.todayKey());
+    } catch (_) {
+      return ApiUsage(dateKey: ApiUsage.todayKey());
+    }
+  }
+
+  Future<void> saveUsage(ApiUsage usage) async {
+    final box = await Hive.openBox(_usageBoxName);
+    await box.put(_usageKey, usage.normalizedForToday().toJson());
+  }
+
+  Future<List<ConversationSession>> readSessions() async {
+    try {
+      final box = await Hive.openBox(_historyBoxName);
+      final sessions = box.values
+          .whereType<Map>()
+          .map(ConversationSession.fromJson)
+          .where((session) => session.id.isNotEmpty)
+          .toList()
+        ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      return sessions;
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<void> saveSession(ConversationSession session) async {
+    final box = await Hive.openBox(_historyBoxName);
+    await box.put(session.id, session.toJson());
+  }
+
   Future<void> clearHistory() async {
-    final box = await Hive.openBox('eloq_history');
+    final box = await Hive.openBox(_historyBoxName);
     await box.clear();
   }
 
@@ -76,4 +123,5 @@ class StorageService {
   }
 }
 
-final storageServiceProvider = Provider<StorageService>((ref) => StorageService());
+final storageServiceProvider =
+    Provider<StorageService>((ref) => StorageService());
