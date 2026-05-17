@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_colors.dart';
 import '../../home/widgets/topic_grid.dart';
 
 class TopicsScreen extends StatelessWidget {
@@ -8,10 +9,30 @@ class TopicsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Topics')),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: const [TopicGrid()],
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 390),
+          child: SafeArea(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 118),
+              children: [
+                Text(
+                  'Practice Topics',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Choose a real-life speaking scene.',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 18),
+                const TopicGrid(),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

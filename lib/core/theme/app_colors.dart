@@ -3,15 +3,21 @@ import 'package:flutter/material.dart';
 class AppColors {
   const AppColors._();
 
-  static const bgPrimary = Color(0xFF0A0A0F);
-  static const bgSecondary = Color(0xFF12121A);
-  static const bgCard = Color(0xFF1A1A2E);
-  static const accentPurple = Color(0xFF6C5CE7);
-  static const accentTeal = Color(0xFF00CEC9);
-  static const accentGreen = Color(0xFF00B894);
-  static const accentYellow = Color(0xFFFDCB6E);
-  static const accentRed = Color(0xFFE17055);
-  static const textPrimary = Color(0xFFF5F5F7);
-  static const textSecondary = Color(0xFF8B8B9E);
-  static const border = Color(0x14FFFFFF);
+  static const bgPrimary = Color(0xFFF4EEFF);
+  static const bgSecondary = Color(0xFFFBF9FF);
+  static const bgCard = Color(0xFFFFFFFF);
+  static const accentPurple = Color(0xFF8A4FE8);
+  static const accentTeal = Color(0xFFB89BFF);
+  static const accentGreen = Color(0xFF6DCD96);
+  static const accentYellow = Color(0xFFFFC65B);
+  static const accentRed = Color(0xFFE45B73);
+  static const textPrimary = Color(0xFF20202B);
+  static const textSecondary = Color(0xFF8E88A1);
+  static const border = Color(0xFFE9E1F6);
+
+  static const lavender = Color(0xFFEDE3FF);
+  static const lavenderSoft = Color(0xFFF7F2FF);
+  static const purpleDeep = Color(0xFF6F35D6);
+  static const dock = Color(0xFF17161C);
+  static const dockItem = Color(0xFF2A2830);
 }

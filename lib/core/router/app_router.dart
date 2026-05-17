@@ -9,6 +9,7 @@ import '../../features/progress/screens/progress_screen.dart';
 import '../../features/settings/screens/settings_screen.dart';
 import '../../features/topics/screens/topics_screen.dart';
 import '../../features/vocabulary/screens/vocabulary_screen.dart';
+import '../theme/app_colors.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -70,20 +71,122 @@ class AppShell extends StatelessWidget {
     };
 
     return Scaffold(
-      body: child,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: index,
-        onDestinationSelected: (selected) {
-          final routes = ['/home', '/topics', '/progress', '/vocabulary', '/settings'];
-          context.go(routes[selected]);
-        },
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_rounded), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.grid_view_rounded), label: 'Topics'),
-          NavigationDestination(icon: Icon(Icons.show_chart_rounded), label: 'Progress'),
-          NavigationDestination(icon: Icon(Icons.bookmark_rounded), label: 'Vocab'),
-          NavigationDestination(icon: Icon(Icons.settings_rounded), label: 'Settings'),
+      backgroundColor: AppColors.bgPrimary,
+      body: Stack(
+        children: [
+          Positioned.fill(child: child),
+          Positioned(
+            left: 24,
+            right: 24,
+            bottom: 12,
+            child: SafeArea(
+              child: _FloatingDock(
+                selectedIndex: index,
+                onSelected: (selected) {
+                  final routes = [
+                    '/home',
+                    '/topics',
+                    '/progress',
+                    '/vocabulary',
+                    '/settings',
+                  ];
+                  context.go(routes[selected]);
+                },
+              ),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+class _FloatingDock extends StatelessWidget {
+  const _FloatingDock({
+    required this.selectedIndex,
+    required this.onSelected,
+  });
+
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    const icons = [
+      Icons.headphones_rounded,
+      Icons.search_rounded,
+      Icons.insert_chart_outlined_rounded,
+      Icons.person_outline_rounded,
+      Icons.settings_rounded,
+    ];
+    const labels = ['Home', 'Topics', 'Progress', 'Vocab', 'Settings'];
+
+    return Center(
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 390),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.dock,
+          borderRadius: BorderRadius.circular(32),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.24),
+              blurRadius: 30,
+              offset: const Offset(0, 14),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            for (var i = 0; i < icons.length; i++)
+              _DockButton(
+                icon: icons[i],
+                label: labels[i],
+                selected: selectedIndex == i,
+                onTap: () => onSelected(i),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DockButton extends StatelessWidget {
+  const _DockButton({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: label,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(26),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          width: 52,
+          height: 52,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: selected ? AppColors.accentPurple : AppColors.dockItem,
+          ),
+          child: Icon(
+            icon,
+            color: selected ? Colors.white : Colors.white.withOpacity(0.62),
+            size: 23,
+          ),
+        ),
       ),
     );
   }

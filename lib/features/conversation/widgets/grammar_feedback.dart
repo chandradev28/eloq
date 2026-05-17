@@ -14,9 +14,9 @@ class GrammarFeedback extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.accentYellow.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(14),
-        border: const Border(left: BorderSide(color: AppColors.accentYellow, width: 3)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.accentYellow.withOpacity(0.45)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

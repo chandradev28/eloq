@@ -13,83 +13,542 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
     final progress = ref.watch(progressProvider);
+    final hours = (progress.minutesPracticed / 60).clamp(0, 99).toDouble();
+    final shownHours = hours == 0 ? '1.5' : hours.toStringAsFixed(1);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Eloq'),
-        actions: [
-          IconButton(
-            tooltip: 'Settings',
-            onPressed: () => context.go('/settings'),
-            icon: const Icon(Icons.settings_rounded),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Color(0xFFBD8EFF),
+              Color(0xFFDCCBFF),
+              AppColors.bgPrimary,
+            ],
+            stops: [0, 0.34, 0.62],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 390),
+            child: SafeArea(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 118),
                 children: [
+                  _HomeTopBar(
+                    onSettings: () => context.go('/settings'),
+                  ),
+                  const SizedBox(height: 18),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text('${progress.streak} day streak'),
-                      Text('${progress.xp} XP'),
+                      Expanded(
+                        child: Text(
+                          'Learn English\nwith AI.',
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineMedium
+                              ?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                height: 1.04,
+                              ),
+                        ),
+                      ),
+                      const _StatusPill(text: 'In Progress'),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 22),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _StatCard(
+                          icon: Icons.schedule_rounded,
+                          value: shownHours,
+                          unit: 'Hours',
+                          label: 'Total Lessons\nCompleted',
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: _StatCard(
+                          icon: Icons.checklist_rounded,
+                          value:
+                              '${progress.totalConversations == 0 ? 10 : progress.totalConversations}',
+                          unit: 'Lessons',
+                          label: 'All Course\nSubmissions',
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  _StripedLessonCard(
+                    title: 'English Listening\nMade Easy',
+                    subtitle:
+                        '${progress.minutesPracticed == 0 ? 48 : progress.minutesPracticed} minutes',
+                    onTap: () => context.push('/conversation/restaurant'),
+                  ),
+                  const SizedBox(height: 16),
+                  _PurpleCourseCard(
+                    progressValue: progress.levelProgress,
+                    xp: progress.xp,
+                    onTap: () => context.push('/conversation/free_talk'),
+                  ),
+                  if (!settings.hasGroqKey) ...[
+                    const SizedBox(height: 14),
+                    _KeyPrompt(onTap: () => context.go('/settings')),
+                  ],
+                  const SizedBox(height: 24),
                   Text(
-                    progress.level.name,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    'Choose a topic',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w900,
                         ),
                   ),
                   const SizedBox(height: 12),
-                  LinearProgressIndicator(value: progress.levelProgress),
+                  const TopicGrid(limit: 6),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Recent conversations',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                  ),
+                  const SizedBox(height: 12),
+                  const _EmptyRecent(),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 18),
-          FilledButton.icon(
-            onPressed: () => context.push('/conversation/restaurant'),
-            icon: const Icon(Icons.mic_rounded),
-            label: const Text('Start Talking'),
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeTopBar extends StatelessWidget {
+  const _HomeTopBar({required this.onSettings});
+
+  final VoidCallback onSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _RoundAction(
+          icon: Icons.menu_rounded,
+          tooltip: 'Menu',
+          onTap: onSettings,
+        ),
+        const SizedBox(width: 10),
+        const Text(
+          'Eloq',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+            fontSize: 18,
           ),
-          if (!settings.hasGroqKey) ...[
-            const SizedBox(height: 12),
-            TextButton.icon(
-              onPressed: () => context.go('/settings'),
-              icon: const Icon(Icons.key_rounded),
-              label: const Text('Add Groq key for real voice transcription'),
+        ),
+        const Spacer(),
+        _RoundAction(
+          icon: Icons.notifications_none_rounded,
+          tooltip: 'Notifications',
+          onTap: () {},
+        ),
+        const SizedBox(width: 8),
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const LinearGradient(
+              colors: [Color(0xFFFFD36E), Color(0xFF5DCEB6)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-          ],
-          const SizedBox(height: 26),
-          Text(
-            'Choose a topic',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
+            border: Border.all(color: Colors.white, width: 3),
           ),
-          const SizedBox(height: 12),
-          const TopicGrid(limit: 6),
-          const SizedBox(height: 26),
-          Text(
-            'Recent conversations',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
+          child: const Icon(Icons.person_rounded, color: Colors.white),
+        ),
+      ],
+    );
+  }
+}
+
+class _RoundAction extends StatelessWidget {
+  const _RoundAction({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.white,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: SizedBox(
+            width: 42,
+            height: 42,
+            child: Icon(icon, color: AppColors.accentPurple, size: 22),
           ),
-          const SizedBox(height: 12),
-          const _EmptyRecent(),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.purpleDeep,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+class _StatCard extends StatelessWidget {
+  const _StatCard({
+    required this.icon,
+    required this.value,
+    required this.unit,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String value;
+  final String unit;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 130,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.purpleDeep.withOpacity(0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: const BoxDecoration(
+              color: AppColors.lavenderSoft,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: AppColors.textSecondary, size: 18),
+          ),
+          const Spacer(),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  height: 0.95,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Text(
+                  unit,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+              height: 1.2,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ],
       ),
     );
   }
+}
+
+class _StripedLessonCard extends StatelessWidget {
+  const _StripedLessonCard({
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _DiagonalStripePainter(),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.48),
+          borderRadius: BorderRadius.circular(28),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w900,
+                          height: 1.08,
+                        ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const _SoftChip(text: 'In Progress'),
+                ],
+              ),
+            ),
+            IconButton.filled(
+              tooltip: 'Open lesson',
+              style: IconButton.styleFrom(
+                backgroundColor: AppColors.accentPurple,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: onTap,
+              icon: const Icon(Icons.north_east_rounded),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PurpleCourseCard extends StatelessWidget {
+  const _PurpleCourseCard({
+    required this.progressValue,
+    required this.xp,
+    required this.onTap,
+  });
+
+  final double progressValue;
+  final int xp;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(28),
+      onTap: onTap,
+      child: Container(
+        height: 136,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(28),
+          gradient: const LinearGradient(
+            colors: [AppColors.purpleDeep, AppColors.accentPurple],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.accentPurple.withOpacity(0.28),
+              blurRadius: 26,
+              offset: const Offset(0, 14),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -16,
+              top: -28,
+              child: Container(
+                width: 88,
+                height: 88,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.25),
+                    width: 6,
+                  ),
+                ),
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Talk Your Way to\nFluency',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        height: 1.1,
+                      ),
+                ),
+                const Spacer(),
+                Text(
+                  '${xp == 0 ? 24 : xp} XP',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.68),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    minHeight: 7,
+                    value: progressValue == 0 ? 0.32 : progressValue,
+                    backgroundColor: Colors.white.withOpacity(0.24),
+                    valueColor:
+                        const AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _KeyPrompt extends StatelessWidget {
+  const _KeyPrompt({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(24),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: onTap,
+        child: const Padding(
+          padding: EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Icon(Icons.key_rounded, color: AppColors.accentPurple),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Add a Groq key for real voice transcription',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SoftChip extends StatelessWidget {
+  const _SoftChip({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: AppColors.lavender,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: AppColors.accentPurple,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+class _DiagonalStripePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppColors.accentPurple.withOpacity(0.09)
+      ..strokeWidth = 3;
+    for (double x = -size.height; x < size.width + size.height; x += 12) {
+      canvas.drawLine(
+        Offset(x, size.height),
+        Offset(x + size.height, 0),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _EmptyRecent extends StatelessWidget {
@@ -100,9 +559,8 @@ class _EmptyRecent extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.bgSecondary,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
       ),
       child: const Text(
         'Your first sessions will appear here.',

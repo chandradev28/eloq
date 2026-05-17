@@ -11,14 +11,15 @@ class TopicGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final topics = limit == null ? Topics.all : Topics.all.take(limit!).toList();
+    final topics =
+        limit == null ? Topics.all : Topics.all.take(limit!).toList();
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: topics.length,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 1.35,
+        childAspectRatio: 1.18,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
       ),
@@ -27,14 +28,33 @@ class TopicGrid extends StatelessWidget {
         return InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () => context.push('/conversation/${topic.id}'),
-          child: Card(
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.purpleDeep.withOpacity(0.06),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
             child: Padding(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Icon(topic.icon, color: AppColors.accentTeal),
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: const BoxDecoration(
+                      color: AppColors.lavenderSoft,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(topic.icon, color: AppColors.accentPurple),
+                  ),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -49,6 +69,7 @@ class TopicGrid extends StatelessWidget {
                         topic.difficulty,
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
                               color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w700,
                             ),
                       ),
                     ],

@@ -41,84 +41,105 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          const _SectionTitle('API keys'),
-          const ApiKeyGuide(),
-          const SizedBox(height: 16),
-          _KeyField(controller: _groq, label: 'Groq API key', required: true),
-          _KeyField(controller: _cerebras, label: 'Cerebras API key'),
-          _KeyField(controller: _sambanova, label: 'SambaNova API key'),
-          _KeyField(controller: _gemini, label: 'Gemini API key'),
-          _KeyField(controller: _openRouter, label: 'OpenRouter API key'),
-          _KeyField(controller: _xai, label: 'xAI API key'),
-          const SizedBox(height: 20),
-          const _SectionTitle('Practice'),
-          SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(value: 'beginner', label: Text('Beginner')),
-              ButtonSegment(value: 'intermediate', label: Text('Intermediate')),
-              ButtonSegment(value: 'advanced', label: Text('Advanced')),
-            ],
-            selected: {settings.difficulty},
-            onSelectionChanged: (selection) {
-              ref.read(settingsProvider.notifier).update(
-                    (current) => current.copyWith(difficulty: selection.first),
-                  );
-            },
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 390),
+          child: SafeArea(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 118),
+              children: [
+                Text(
+                  'Settings',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                ),
+                const SizedBox(height: 18),
+                const _SectionTitle('API keys'),
+                const ApiKeyGuide(),
+                const SizedBox(height: 16),
+                _KeyField(
+                    controller: _groq, label: 'Groq API key', required: true),
+                _KeyField(controller: _cerebras, label: 'Cerebras API key'),
+                _KeyField(controller: _sambanova, label: 'SambaNova API key'),
+                _KeyField(controller: _gemini, label: 'Gemini API key'),
+                _KeyField(controller: _openRouter, label: 'OpenRouter API key'),
+                _KeyField(controller: _xai, label: 'xAI API key'),
+                const SizedBox(height: 20),
+                const _SectionTitle('Practice'),
+                SegmentedButton<String>(
+                  segments: const [
+                    ButtonSegment(value: 'beginner', label: Text('Beginner')),
+                    ButtonSegment(
+                        value: 'intermediate', label: Text('Intermediate')),
+                    ButtonSegment(value: 'advanced', label: Text('Advanced')),
+                  ],
+                  selected: {settings.difficulty},
+                  onSelectionChanged: (selection) {
+                    ref.read(settingsProvider.notifier).update(
+                          (current) =>
+                              current.copyWith(difficulty: selection.first),
+                        );
+                  },
+                ),
+                const SizedBox(height: 16),
+                SegmentedButton<String>(
+                  segments: const [
+                    ButtonSegment(value: 'free', label: Text('Free')),
+                    ButtonSegment(value: 'premium', label: Text('Premium')),
+                  ],
+                  selected: {settings.voiceMode},
+                  onSelectionChanged: (selection) {
+                    ref.read(settingsProvider.notifier).update(
+                          (current) =>
+                              current.copyWith(voiceMode: selection.first),
+                        );
+                  },
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Speaking speed ${settings.speakingSpeed.toStringAsFixed(1)}x',
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                Slider(
+                  min: 0.5,
+                  max: 2.0,
+                  divisions: 15,
+                  value: settings.speakingSpeed,
+                  onChanged: (value) {
+                    ref.read(settingsProvider.notifier).update(
+                          (current) => current.copyWith(speakingSpeed: value),
+                        );
+                  },
+                ),
+                const SizedBox(height: 20),
+                FilledButton.icon(
+                  onPressed: _save,
+                  icon: const Icon(Icons.save_rounded),
+                  label: const Text('Save settings'),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content:
+                            Text('Export will be added with history storage.'),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.file_download_rounded),
+                  label: const Text('Export progress'),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'Premium xAI voice mode is scaffolded for Phase 4. Free mode uses Groq Whisper, the rotating LLM router, and device TTS.',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 16),
-          SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(value: 'free', label: Text('Free')),
-              ButtonSegment(value: 'premium', label: Text('Premium')),
-            ],
-            selected: {settings.voiceMode},
-            onSelectionChanged: (selection) {
-              ref.read(settingsProvider.notifier).update(
-                    (current) => current.copyWith(voiceMode: selection.first),
-                  );
-            },
-          ),
-          const SizedBox(height: 16),
-          Text('Speaking speed ${settings.speakingSpeed.toStringAsFixed(1)}x'),
-          Slider(
-            min: 0.5,
-            max: 2.0,
-            divisions: 15,
-            value: settings.speakingSpeed,
-            onChanged: (value) {
-              ref.read(settingsProvider.notifier).update(
-                    (current) => current.copyWith(speakingSpeed: value),
-                  );
-            },
-          ),
-          const SizedBox(height: 20),
-          FilledButton.icon(
-            onPressed: _save,
-            icon: const Icon(Icons.save_rounded),
-            label: const Text('Save settings'),
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content:
-                        Text('Export will be added with history storage.')),
-              );
-            },
-            icon: const Icon(Icons.file_download_rounded),
-            label: const Text('Export progress'),
-          ),
-          const SizedBox(height: 18),
-          const Text(
-            'Premium xAI voice mode is scaffolded for Phase 4. Free mode uses Groq Whisper, the rotating LLM router, and device TTS.',
-            style: TextStyle(color: AppColors.textSecondary),
-          ),
-        ],
+        ),
       ),
     );
   }

@@ -14,6 +14,7 @@ class ChatBubble extends StatelessWidget {
     final isUser = message.isUser;
     final alignment = isUser ? Alignment.centerRight : Alignment.centerLeft;
     final bubbleColor = isUser ? AppColors.accentPurple : AppColors.bgCard;
+    final foreground = isUser ? Colors.white : AppColors.textPrimary;
 
     return Align(
       alignment: alignment,
@@ -25,11 +26,24 @@ class ChatBubble extends StatelessWidget {
           children: [
             Container(
               margin: const EdgeInsets.symmetric(vertical: 6),
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: bubbleColor,
-                borderRadius: BorderRadius.circular(16),
-                border: isUser ? null : Border.all(color: AppColors.border),
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(22),
+                  topRight: const Radius.circular(22),
+                  bottomLeft: Radius.circular(isUser ? 22 : 6),
+                  bottomRight: Radius.circular(isUser ? 6 : 22),
+                ),
+                boxShadow: isUser
+                    ? []
+                    : [
+                        BoxShadow(
+                          color: AppColors.purpleDeep.withOpacity(0.06),
+                          blurRadius: 18,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -37,12 +51,14 @@ class ChatBubble extends StatelessWidget {
                   Text(
                     isUser ? 'You' : 'Eloq',
                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                          color: AppColors.textSecondary,
+                          color: isUser
+                              ? Colors.white.withOpacity(0.72)
+                              : AppColors.textSecondary,
                           fontWeight: FontWeight.w700,
                         ),
                   ),
                   const SizedBox(height: 6),
-                  Text(message.text),
+                  Text(message.text, style: TextStyle(color: foreground)),
                 ],
               ),
             ),
