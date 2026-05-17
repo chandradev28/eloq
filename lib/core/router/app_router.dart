@@ -71,7 +71,7 @@ class AppShell extends StatelessWidget {
     };
 
     return Scaffold(
-      backgroundColor: AppColors.bgPrimary,
+      backgroundColor: AppColors.page(context),
       body: Stack(
         children: [
           Positioned.fill(child: child),

@@ -11,6 +11,7 @@ class AppSettings {
     this.voiceName = '',
     this.speakingSpeed = 1.0,
     this.accent = 'US',
+    this.isDarkMode = false,
   });
 
   final String groqApiKey;
@@ -24,6 +25,7 @@ class AppSettings {
   final String voiceName;
   final double speakingSpeed;
   final String accent;
+  final bool isDarkMode;
 
   bool get hasGroqKey => groqApiKey.trim().isNotEmpty;
   bool get hasAnyLlmKey =>
@@ -45,6 +47,7 @@ class AppSettings {
     String? voiceName,
     double? speakingSpeed,
     String? accent,
+    bool? isDarkMode,
   }) {
     return AppSettings(
       groqApiKey: groqApiKey ?? this.groqApiKey,
@@ -58,6 +61,7 @@ class AppSettings {
       voiceName: voiceName ?? this.voiceName,
       speakingSpeed: speakingSpeed ?? this.speakingSpeed,
       accent: accent ?? this.accent,
+      isDarkMode: isDarkMode ?? this.isDarkMode,
     );
   }
 
@@ -67,6 +71,7 @@ class AppSettings {
         'voiceName': voiceName,
         'speakingSpeed': speakingSpeed,
         'accent': accent,
+        'isDarkMode': isDarkMode,
       };
 
   factory AppSettings.fromJson(Map<dynamic, dynamic> json) {
@@ -76,6 +81,7 @@ class AppSettings {
       voiceName: json['voiceName']?.toString() ?? '',
       speakingSpeed: (json['speakingSpeed'] as num?)?.toDouble() ?? 1.0,
       accent: json['accent']?.toString() ?? 'US',
+      isDarkMode: json['isDarkMode'] == true,
     );
   }
 }

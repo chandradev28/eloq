@@ -28,21 +28,23 @@ class VocabularyScreen extends StatelessWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.all(22),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppColors.surface(context),
                       borderRadius: BorderRadius.circular(28),
                     ),
-                    child: const Column(
+                    child: Column(
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.bookmark_rounded,
                           color: AppColors.accentPurple,
                           size: 42,
                         ),
-                        SizedBox(height: 12),
+                        const SizedBox(height: 12),
                         Text(
                           'Saved words will appear here after vocabulary capture is added.',
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: AppColors.textSecondary),
+                          style: TextStyle(
+                            color: AppColors.secondaryText(context),
+                          ),
                         ),
                       ],
                     ),

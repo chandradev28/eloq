@@ -13,8 +13,9 @@ class ChatBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final isUser = message.isUser;
     final alignment = isUser ? Alignment.centerRight : Alignment.centerLeft;
-    final bubbleColor = isUser ? AppColors.accentPurple : AppColors.bgCard;
-    final foreground = isUser ? Colors.white : AppColors.textPrimary;
+    final bubbleColor =
+        isUser ? AppColors.accentPurple : AppColors.surface(context);
+    final foreground = isUser ? Colors.white : AppColors.primaryText(context);
 
     return Align(
       alignment: alignment,
@@ -53,7 +54,7 @@ class ChatBubble extends StatelessWidget {
                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
                           color: isUser
                               ? Colors.white.withOpacity(0.72)
-                              : AppColors.textSecondary,
+                              : AppColors.secondaryText(context),
                           fontWeight: FontWeight.w700,
                         ),
                   ),

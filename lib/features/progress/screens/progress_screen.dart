@@ -43,7 +43,7 @@ class ProgressScreen extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppColors.surface(context),
                     borderRadius: BorderRadius.circular(28),
                     boxShadow: [
                       BoxShadow(
@@ -68,7 +68,8 @@ class ProgressScreen extends ConsumerWidget {
                       const SizedBox(height: 8),
                       Text(
                         '${progress.xp} XP toward ${progress.nextLevel.name}',
-                        style: const TextStyle(color: AppColors.textSecondary),
+                        style:
+                            TextStyle(color: AppColors.secondaryText(context)),
                       ),
                     ],
                   ),
@@ -89,7 +90,7 @@ class ProgressScreen extends ConsumerWidget {
                     return Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: AppColors.surface(context),
                         borderRadius: BorderRadius.circular(24),
                       ),
                       child: Column(
@@ -99,8 +100,8 @@ class ProgressScreen extends ConsumerWidget {
                           Container(
                             width: 38,
                             height: 38,
-                            decoration: const BoxDecoration(
-                              color: AppColors.lavenderSoft,
+                            decoration: BoxDecoration(
+                              color: AppColors.softSurface(context),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(stat.$3, color: AppColors.accentPurple),
@@ -117,8 +118,8 @@ class ProgressScreen extends ConsumerWidget {
                               ),
                               Text(
                                 stat.$1,
-                                style: const TextStyle(
-                                  color: AppColors.textSecondary,
+                                style: TextStyle(
+                                  color: AppColors.secondaryText(context),
                                 ),
                               ),
                             ],

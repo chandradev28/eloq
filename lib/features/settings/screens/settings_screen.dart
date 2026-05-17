@@ -55,6 +55,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                 ),
                 const SizedBox(height: 18),
+                const _SectionTitle('Appearance'),
+                _AppearanceCard(
+                  isDarkMode: settings.isDarkMode,
+                  onChanged: (value) {
+                    ref.read(settingsProvider.notifier).update(
+                          (current) => current.copyWith(isDarkMode: value),
+                        );
+                  },
+                ),
+                const SizedBox(height: 20),
                 const _SectionTitle('API keys'),
                 const ApiKeyGuide(),
                 const SizedBox(height: 16),
@@ -132,9 +142,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   label: const Text('Export progress'),
                 ),
                 const SizedBox(height: 18),
-                const Text(
+                Text(
                   'Premium xAI voice mode is scaffolded for Phase 4. Free mode uses Groq Whisper, the rotating LLM router, and device TTS.',
-                  style: TextStyle(color: AppColors.textSecondary),
+                  style: TextStyle(color: AppColors.secondaryText(context)),
                 ),
               ],
             ),
@@ -169,6 +179,68 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Settings saved')),
+    );
+  }
+}
+
+class _AppearanceCard extends StatelessWidget {
+  const _AppearanceCard({
+    required this.isDarkMode,
+    required this.onChanged,
+  });
+
+  final bool isDarkMode;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface(context),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.line(context)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: AppColors.softSurface(context),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isDarkMode ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+              color: AppColors.accentPurple,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Dark mode',
+                  style: TextStyle(
+                    color: AppColors.primaryText(context),
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Use a darker purple interface.',
+                  style: TextStyle(
+                    color: AppColors.secondaryText(context),
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(value: isDarkMode, onChanged: onChanged),
+        ],
+      ),
     );
   }
 }

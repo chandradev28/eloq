@@ -18,14 +18,20 @@ class HomeScreen extends ConsumerWidget {
 
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Color(0xFFBD8EFF),
-              Color(0xFFDCCBFF),
-              AppColors.bgPrimary,
-            ],
-            stops: [0, 0.34, 0.62],
+            colors: AppColors.isDark(context)
+                ? const [
+                    Color(0xFF3C216C),
+                    Color(0xFF241A38),
+                    AppColors.darkBg,
+                  ]
+                : const [
+                    Color(0xFFBD8EFF),
+                    Color(0xFFDCCBFF),
+                    AppColors.bgPrimary,
+                  ],
+            stops: const [0, 0.34, 0.62],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -193,7 +199,7 @@ class _RoundAction extends StatelessWidget {
     return Tooltip(
       message: tooltip,
       child: Material(
-        color: Colors.white,
+        color: AppColors.surface(context),
         shape: const CircleBorder(),
         child: InkWell(
           customBorder: const CircleBorder(),
@@ -253,7 +259,7 @@ class _StatCard extends StatelessWidget {
       height: 130,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface(context),
         borderRadius: BorderRadius.circular(26),
         boxShadow: [
           BoxShadow(
@@ -269,11 +275,12 @@ class _StatCard extends StatelessWidget {
           Container(
             width: 32,
             height: 32,
-            decoration: const BoxDecoration(
-              color: AppColors.lavenderSoft,
+            decoration: BoxDecoration(
+              color: AppColors.softSurface(context),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: AppColors.textSecondary, size: 18),
+            child:
+                Icon(icon, color: AppColors.secondaryText(context), size: 18),
           ),
           const Spacer(),
           Row(
@@ -281,7 +288,8 @@ class _StatCard extends StatelessWidget {
             children: [
               Text(
                 value,
-                style: const TextStyle(
+                style: TextStyle(
+                  color: AppColors.primaryText(context),
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
                   height: 0.95,
@@ -292,8 +300,8 @@ class _StatCard extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 2),
                 child: Text(
                   unit,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
+                  style: TextStyle(
+                    color: AppColors.secondaryText(context),
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
@@ -304,8 +312,8 @@ class _StatCard extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             label,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
+            style: TextStyle(
+              color: AppColors.secondaryText(context),
               fontSize: 12,
               height: 1.2,
               fontWeight: FontWeight.w700,
@@ -335,7 +343,9 @@ class _StripedLessonCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.48),
+          color: AppColors.surface(context).withOpacity(
+            AppColors.isDark(context) ? 0.74 : 0.48,
+          ),
           borderRadius: BorderRadius.circular(28),
         ),
         child: Row(
@@ -355,8 +365,8 @@ class _StripedLessonCard extends StatelessWidget {
                   const SizedBox(height: 10),
                   Text(
                     subtitle,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
+                    style: TextStyle(
+                      color: AppColors.secondaryText(context),
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                     ),
@@ -481,24 +491,30 @@ class _KeyPrompt extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: AppColors.surface(context),
       borderRadius: BorderRadius.circular(24),
       child: InkWell(
         borderRadius: BorderRadius.circular(24),
         onTap: onTap,
-        child: const Padding(
-          padding: EdgeInsets.all(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              Icon(Icons.key_rounded, color: AppColors.accentPurple),
-              SizedBox(width: 12),
+              const Icon(Icons.key_rounded, color: AppColors.accentPurple),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   'Add a Groq key for real voice transcription',
-                  style: TextStyle(fontWeight: FontWeight.w800),
+                  style: TextStyle(
+                    color: AppColors.primaryText(context),
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.secondaryText(context),
+              ),
             ],
           ),
         ),
@@ -517,7 +533,7 @@ class _SoftChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: AppColors.lavender,
+        color: AppColors.softSurface(context),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
@@ -559,12 +575,12 @@ class _EmptyRecent extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface(context),
         borderRadius: BorderRadius.circular(24),
       ),
-      child: const Text(
+      child: Text(
         'Your first sessions will appear here.',
-        style: TextStyle(color: AppColors.textSecondary),
+        style: TextStyle(color: AppColors.secondaryText(context)),
       ),
     );
   }

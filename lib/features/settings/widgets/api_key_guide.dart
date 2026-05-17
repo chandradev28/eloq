@@ -22,9 +22,9 @@ class ApiKeyGuide extends StatelessWidget {
                   ),
             ),
             const SizedBox(height: 6),
-            const Text(
+            Text(
               'Start with Groq. Add more free providers only when you want extra daily capacity.',
-              style: TextStyle(color: AppColors.textSecondary),
+              style: TextStyle(color: AppColors.secondaryText(context)),
             ),
             const SizedBox(height: 14),
             const _ProviderGroup(
@@ -84,7 +84,7 @@ class _ProviderGroup extends StatelessWidget {
         Text(
           title,
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: AppColors.textSecondary,
+                color: AppColors.secondaryText(context),
                 fontWeight: FontWeight.w800,
               ),
         ),
@@ -132,8 +132,8 @@ class _ProviderRow extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   provider.description,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
+                  style: TextStyle(
+                    color: AppColors.secondaryText(context),
                     fontSize: 13,
                   ),
                 ),

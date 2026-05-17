@@ -396,19 +396,29 @@ class _PromptMeter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Row(
+    return Row(
       children: [
-        Icon(Icons.auto_awesome_rounded,
-            color: AppColors.textPrimary, size: 18),
-        SizedBox(width: 6),
+        Icon(
+          Icons.auto_awesome_rounded,
+          color: AppColors.primaryText(context),
+          size: 18,
+        ),
+        const SizedBox(width: 6),
         Text(
           '16 Prompts left',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+          style: TextStyle(
+            color: AppColors.primaryText(context),
+            fontWeight: FontWeight.w800,
+            fontSize: 12,
+          ),
         ),
-        Spacer(),
+        const Spacer(),
         Text(
           'Powered by GPT-5',
-          style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+          style: TextStyle(
+            color: AppColors.secondaryText(context),
+            fontSize: 12,
+          ),
         ),
       ],
     );
@@ -433,13 +443,16 @@ class _PromptChips extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: selected ? AppColors.accentPurple : Colors.white,
+              color: selected
+                  ? AppColors.accentPurple
+                  : AppColors.surface(context),
               borderRadius: BorderRadius.circular(999),
             ),
             child: Text(
               chips[index],
               style: TextStyle(
-                color: selected ? Colors.white : AppColors.textSecondary,
+                color:
+                    selected ? Colors.white : AppColors.secondaryText(context),
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
               ),
@@ -459,27 +472,33 @@ class _RoadmapPreview extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface(context),
         borderRadius: BorderRadius.circular(24),
       ),
-      child: const Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Text(
                 'Roadmap',
-                style: TextStyle(fontWeight: FontWeight.w900),
+                style: TextStyle(
+                  color: AppColors.primaryText(context),
+                  fontWeight: FontWeight.w900,
+                ),
               ),
-              Spacer(),
+              const Spacer(),
               Text(
                 'Day   Week   Month   Year',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                style: TextStyle(
+                  color: AppColors.secondaryText(context),
+                  fontSize: 11,
+                ),
               ),
             ],
           ),
-          SizedBox(height: 14),
-          Row(
+          const SizedBox(height: 14),
+          const Row(
             children: [
               Expanded(
                 child: _RoadmapPill(
@@ -497,8 +516,8 @@ class _RoadmapPreview extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: 10),
-          _RoadmapPill(
+          const SizedBox(height: 10),
+          const _RoadmapPill(
             icon: Icons.school_rounded,
             text: 'Skill Test',
             compact: true,
@@ -532,21 +551,21 @@ class _RoadmapPill extends StatelessWidget {
           vertical: 9,
         ),
         decoration: BoxDecoration(
-          color: striped ? Colors.transparent : AppColors.lavenderSoft,
+          color: striped ? Colors.transparent : AppColors.softSurface(context),
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: AppColors.line(context)),
         ),
         child: Row(
           mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
           children: [
-            Icon(icon, size: 16, color: AppColors.textSecondary),
+            Icon(icon, size: 16, color: AppColors.secondaryText(context)),
             const SizedBox(width: 6),
             Flexible(
               child: Text(
                 text,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
+                style: TextStyle(
+                  color: AppColors.secondaryText(context),
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
                 ),

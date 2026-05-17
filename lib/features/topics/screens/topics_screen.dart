@@ -23,9 +23,9 @@ class TopicsScreen extends StatelessWidget {
                       ),
                 ),
                 const SizedBox(height: 6),
-                const Text(
+                Text(
                   'Choose a real-life speaking scene.',
-                  style: TextStyle(color: AppColors.textSecondary),
+                  style: TextStyle(color: AppColors.secondaryText(context)),
                 ),
                 const SizedBox(height: 18),
                 const TopicGrid(),

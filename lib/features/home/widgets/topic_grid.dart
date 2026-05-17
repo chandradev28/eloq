@@ -30,7 +30,7 @@ class TopicGrid extends StatelessWidget {
           onTap: () => context.push('/conversation/${topic.id}'),
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface(context),
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
@@ -49,8 +49,8 @@ class TopicGrid extends StatelessWidget {
                   Container(
                     width: 40,
                     height: 40,
-                    decoration: const BoxDecoration(
-                      color: AppColors.lavenderSoft,
+                    decoration: BoxDecoration(
+                      color: AppColors.softSurface(context),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(topic.icon, color: AppColors.accentPurple),
@@ -68,7 +68,7 @@ class TopicGrid extends StatelessWidget {
                       Text(
                         topic.difficulty,
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: AppColors.textSecondary,
+                              color: AppColors.secondaryText(context),
                               fontWeight: FontWeight.w700,
                             ),
                       ),
