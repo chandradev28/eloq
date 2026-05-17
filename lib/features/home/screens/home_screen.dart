@@ -14,7 +14,7 @@ class HomeScreen extends ConsumerWidget {
     final settings = ref.watch(settingsProvider);
     final progress = ref.watch(progressProvider);
     final hours = (progress.minutesPracticed / 60).clamp(0, 99).toDouble();
-    final shownHours = hours == 0 ? '1.5' : hours.toStringAsFixed(1);
+    final shownHours = hours.toStringAsFixed(1);
 
     return Scaffold(
       body: Container(
@@ -45,6 +45,7 @@ class HomeScreen extends ConsumerWidget {
                 children: [
                   _HomeTopBar(
                     onSettings: () => context.go('/settings'),
+                    onNotifications: () => _showNotifications(context),
                   ),
                   const SizedBox(height: 18),
                   Row(
@@ -63,7 +64,7 @@ class HomeScreen extends ConsumerWidget {
                               ),
                         ),
                       ),
-                      const _StatusPill(text: 'In Progress'),
+                      _StatusPill(text: progress.level.name),
                     ],
                   ),
                   const SizedBox(height: 22),
@@ -74,30 +75,29 @@ class HomeScreen extends ConsumerWidget {
                           icon: Icons.schedule_rounded,
                           value: shownHours,
                           unit: 'Hours',
-                          label: 'Total Lessons\nCompleted',
+                          label: 'Total Practice\nTime',
                         ),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
                         child: _StatCard(
                           icon: Icons.checklist_rounded,
-                          value:
-                              '${progress.totalConversations == 0 ? 10 : progress.totalConversations}',
-                          unit: 'Lessons',
-                          label: 'All Course\nSubmissions',
+                          value: progress.totalConversations.toString(),
+                          unit: 'Sessions',
+                          label: 'Completed\nConversations',
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 18),
-                  _StripedLessonCard(
-                    title: 'English Listening\nMade Easy',
-                    subtitle:
-                        '${progress.minutesPracticed == 0 ? 48 : progress.minutesPracticed} minutes',
+                  _StripedPracticeCard(
+                    title: 'Speaking Practice',
+                    subtitle: '${progress.minutesPracticed} minutes practiced',
+                    chipText: '${progress.errorsCorrected} corrections',
                     onTap: () => context.push('/conversation/restaurant'),
                   ),
                   const SizedBox(height: 16),
-                  _PurpleCourseCard(
+                  _PurpleProgressCard(
                     progressValue: progress.levelProgress,
                     xp: progress.xp,
                     onTap: () => context.push('/conversation/free_talk'),
@@ -134,10 +134,84 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
+void _showNotifications(BuildContext context) {
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    builder: (context) {
+      return SafeArea(
+        child: Container(
+          margin: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppColors.surface(context),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: AppColors.line(context)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    'Notifications',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: AppColors.primaryText(context),
+                          fontWeight: FontWeight.w900,
+                        ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    tooltip: 'Close',
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: AppColors.softSurface(context),
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.notifications_none_rounded,
+                      color: AppColors.accentPurple,
+                      size: 34,
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'No notifications yet.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: AppColors.secondaryText(context),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
 class _HomeTopBar extends StatelessWidget {
-  const _HomeTopBar({required this.onSettings});
+  const _HomeTopBar({
+    required this.onSettings,
+    required this.onNotifications,
+  });
 
   final VoidCallback onSettings;
+  final VoidCallback onNotifications;
 
   @override
   Widget build(BuildContext context) {
@@ -161,22 +235,7 @@ class _HomeTopBar extends StatelessWidget {
         _RoundAction(
           icon: Icons.notifications_none_rounded,
           tooltip: 'Notifications',
-          onTap: () {},
-        ),
-        const SizedBox(width: 8),
-        Container(
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: const LinearGradient(
-              colors: [Color(0xFFFFD36E), Color(0xFF5DCEB6)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            border: Border.all(color: Colors.white, width: 3),
-          ),
-          child: const Icon(Icons.person_rounded, color: Colors.white),
+          onTap: onNotifications,
         ),
       ],
     );
@@ -325,15 +384,17 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-class _StripedLessonCard extends StatelessWidget {
-  const _StripedLessonCard({
+class _StripedPracticeCard extends StatelessWidget {
+  const _StripedPracticeCard({
     required this.title,
     required this.subtitle,
+    required this.chipText,
     required this.onTap,
   });
 
   final String title;
   final String subtitle;
+  final String chipText;
   final VoidCallback onTap;
 
   @override
@@ -372,12 +433,12 @@ class _StripedLessonCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  const _SoftChip(text: 'In Progress'),
+                  _SoftChip(text: chipText),
                 ],
               ),
             ),
             IconButton.filled(
-              tooltip: 'Open lesson',
+              tooltip: 'Start practice',
               style: IconButton.styleFrom(
                 backgroundColor: AppColors.accentPurple,
                 foregroundColor: Colors.white,
@@ -392,8 +453,8 @@ class _StripedLessonCard extends StatelessWidget {
   }
 }
 
-class _PurpleCourseCard extends StatelessWidget {
-  const _PurpleCourseCard({
+class _PurpleProgressCard extends StatelessWidget {
+  const _PurpleProgressCard({
     required this.progressValue,
     required this.xp,
     required this.onTap,
@@ -456,7 +517,7 @@ class _PurpleCourseCard extends StatelessWidget {
                 ),
                 const Spacer(),
                 Text(
-                  '${xp == 0 ? 24 : xp} XP',
+                  '$xp XP',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.68),
                     fontSize: 12,
@@ -468,7 +529,7 @@ class _PurpleCourseCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                   child: LinearProgressIndicator(
                     minHeight: 7,
-                    value: progressValue == 0 ? 0.32 : progressValue,
+                    value: progressValue,
                     backgroundColor: Colors.white.withOpacity(0.24),
                     valueColor:
                         const AlwaysStoppedAnimation<Color>(Colors.white),

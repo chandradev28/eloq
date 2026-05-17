@@ -17,7 +17,7 @@ void main() {
     await tester.pumpWidget(const ProviderScope(child: EloqApp()));
     await tester.pumpAndSettle();
 
-    expect(find.text('Eloq'), findsOneWidget);
-    expect(find.text('Continue'), findsOneWidget);
+    expect(find.text('Set up Eloq'), findsOneWidget);
+    expect(find.text('Groq API key'), findsOneWidget);
   });
 }

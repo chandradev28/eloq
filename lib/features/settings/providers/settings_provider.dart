@@ -20,7 +20,8 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     await _storage.saveSettings(settings);
   }
 
-  Future<void> update(AppSettings Function(AppSettings current) transform) async {
+  Future<void> update(
+      AppSettings Function(AppSettings current) transform) async {
     await save(transform(state));
   }
 }
@@ -50,11 +51,10 @@ class ProgressNotifier extends StateNotifier<UserProgress> {
     await _storage.saveProgress(next);
   }
 
-  Future<void> completeConversation() async {
+  Future<void> completeConversation({required int minutesPracticed}) async {
     final next = state.copyWith(
-      xp: state.xp + 50,
       totalConversations: state.totalConversations + 1,
-      minutesPracticed: state.minutesPracticed + 5,
+      minutesPracticed: state.minutesPracticed + minutesPracticed,
       streak: state.streak == 0 ? 1 : state.streak,
     );
     state = next;

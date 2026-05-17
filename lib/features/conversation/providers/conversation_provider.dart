@@ -61,6 +61,8 @@ class ConversationController extends StateNotifier<ConversationState> {
 
   final Ref ref;
   final _uuid = const Uuid();
+  final DateTime _startedAt = DateTime.now();
+  bool _sessionCounted = false;
 
   Future<void> toggleRecording() async {
     if (state.isRecording) {
@@ -74,7 +76,8 @@ class ConversationController extends StateNotifier<ConversationState> {
     final recorder = ref.read(audioRecorderServiceProvider);
     final hasPermission = await recorder.hasPermission();
     if (!hasPermission) {
-      state = state.copyWith(error: 'Microphone permission is needed to record.');
+      state =
+          state.copyWith(error: 'Microphone permission is needed to record.');
       return;
     }
 
@@ -118,6 +121,7 @@ class ConversationController extends StateNotifier<ConversationState> {
     final text = rawText.trim();
     if (text.isEmpty) return;
 
+    final previousMessages = state.messages;
     final userMessage = Message(
       id: _uuid.v4(),
       role: MessageRole.user,
@@ -136,7 +140,7 @@ class ConversationController extends StateNotifier<ConversationState> {
       final response = await ref.read(llmRouterServiceProvider).sendMessage(
             settings: settings,
             topic: topic,
-            history: state.messages,
+            history: previousMessages,
             userText: text,
           );
       final assistantMessage = Message(
@@ -153,6 +157,7 @@ class ConversationController extends StateNotifier<ConversationState> {
       await ref.read(progressProvider.notifier).addMessageXp(
             corrections: response.corrections.length,
           );
+      await _countSessionOnce();
       await ref
           .read(ttsServiceProvider)
           .speak(response.text, speed: settings.speakingSpeed);
@@ -165,7 +170,9 @@ class ConversationController extends StateNotifier<ConversationState> {
     final settings = ref.read(settingsProvider);
     final last = state.messages.where((item) => !item.isUser).lastOrNull;
     if (last == null) return;
-    await ref.read(ttsServiceProvider).speak(last.text, speed: settings.speakingSpeed);
+    await ref
+        .read(ttsServiceProvider)
+        .speak(last.text, speed: settings.speakingSpeed);
   }
 
   void _seedGreeting() {
@@ -186,9 +193,19 @@ class ConversationController extends StateNotifier<ConversationState> {
     }
     return 'Let us practice ${topic.name.toLowerCase()}. ${topic.prompt}';
   }
+
+  Future<void> _countSessionOnce() async {
+    if (_sessionCounted) return;
+    _sessionCounted = true;
+    final minutesPracticed = DateTime.now().difference(_startedAt).inMinutes;
+    await ref
+        .read(progressProvider.notifier)
+        .completeConversation(minutesPracticed: minutesPracticed);
+  }
 }
 
 final conversationProvider = StateNotifierProvider.family
-    .autoDispose<ConversationController, ConversationState, String>((ref, topicId) {
+    .autoDispose<ConversationController, ConversationState, String>(
+        (ref, topicId) {
   return ConversationController(ref: ref, topicId: topicId);
 });

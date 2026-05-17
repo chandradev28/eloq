@@ -7,13 +7,27 @@ import '../../features/home/screens/home_screen.dart';
 import '../../features/onboarding/screens/onboarding_screen.dart';
 import '../../features/progress/screens/progress_screen.dart';
 import '../../features/settings/screens/settings_screen.dart';
+import '../../features/settings/providers/settings_provider.dart';
 import '../../features/topics/screens/topics_screen.dart';
 import '../../features/vocabulary/screens/vocabulary_screen.dart';
 import '../theme/app_colors.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
+  final settings = ref.watch(settingsProvider);
+
   return GoRouter(
-    initialLocation: '/onboarding',
+    initialLocation: settings.hasCompletedOnboarding ? '/home' : '/onboarding',
+    redirect: (context, state) {
+      final path = state.uri.path;
+      final isOnboarding = path == '/onboarding';
+      if (!settings.hasCompletedOnboarding && !isOnboarding) {
+        return '/onboarding';
+      }
+      if (settings.hasCompletedOnboarding && isOnboarding) {
+        return '/home';
+      }
+      return null;
+    },
     routes: [
       GoRoute(
         path: '/onboarding',

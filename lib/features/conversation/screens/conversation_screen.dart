@@ -43,7 +43,6 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                 _AssistantTopBar(
                   title: topic.name,
                   onBack: () => context.pop(),
-                  onReplay: controller.replayLastAssistant,
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
@@ -51,20 +50,12 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                     isRecording: state.isRecording,
                     isTranscribing: state.isTranscribing,
                     onMic: controller.toggleRecording,
-                    onReplay: controller.replayLastAssistant,
                   ),
-                ),
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(22, 12, 22, 8),
-                  child: _PromptMeter(),
                 ),
                 Expanded(
                   child: ListView(
-                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+                    padding: const EdgeInsets.fromLTRB(18, 20, 18, 12),
                     children: [
-                      const _PromptChips(),
-                      const SizedBox(height: 12),
-                      if (state.messages.isEmpty) const _RoadmapPreview(),
                       for (final message in state.messages)
                         ChatBubble(message: message),
                       if (state.isThinking)
@@ -136,12 +127,10 @@ class _AssistantTopBar extends StatelessWidget {
   const _AssistantTopBar({
     required this.title,
     required this.onBack,
-    required this.onReplay,
   });
 
   final String title;
   final VoidCallback onBack;
-  final VoidCallback onReplay;
 
   @override
   Widget build(BuildContext context) {
@@ -165,11 +154,7 @@ class _AssistantTopBar extends StatelessWidget {
               ),
             ),
           ),
-          IconButton(
-            tooltip: 'Replay',
-            onPressed: onReplay,
-            icon: const Icon(Icons.more_vert_rounded),
-          ),
+          const SizedBox(width: 48),
         ],
       ),
     );
@@ -181,23 +166,21 @@ class _AssistantPanel extends StatelessWidget {
     required this.isRecording,
     required this.isTranscribing,
     required this.onMic,
-    required this.onReplay,
   });
 
   final bool isRecording;
   final bool isTranscribing;
   final VoidCallback onMic;
-  final VoidCallback onReplay;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 245,
-      padding: const EdgeInsets.all(18),
+      height: 224,
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(32),
         gradient: const LinearGradient(
-          colors: [AppColors.accentPurple, AppColors.purpleDeep],
+          colors: [Color(0xFF9A56F0), AppColors.purpleDeep],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -211,136 +194,82 @@ class _AssistantPanel extends StatelessWidget {
       ),
       child: Stack(
         children: [
-          const Positioned(left: 4, top: 2, child: _AvatarStack()),
-          Positioned(
-            right: 0,
-            top: 0,
-            child: _GlassIcon(
-              icon: Icons.tune_rounded,
-              tooltip: 'Assistant settings',
-              onTap: () {},
-            ),
+          const Positioned(
+            left: -28,
+            top: -38,
+            child: _SoftRing(size: 126, opacity: 0.08),
+          ),
+          const Positioned(
+            right: -34,
+            bottom: -44,
+            child: _SoftRing(size: 150, opacity: 0.1),
           ),
           const Align(
-            alignment: Alignment(0, -0.28),
+            alignment: Alignment(0, -0.42),
             child: _AssistantOrb(),
           ),
           Align(
-            alignment: const Alignment(0, 0.34),
+            alignment: const Alignment(0, 0.14),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.12),
+                color: Colors.white.withOpacity(0.14),
                 borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: Colors.white.withOpacity(0.08)),
               ),
               child: Text(
                 isRecording
-                    ? 'Listening...'
+                    ? 'Listening'
                     : isTranscribing
-                        ? 'Transcribing...'
-                        : 'Hi! How can I assist?',
+                        ? 'Transcribing'
+                        : 'Ready to practice',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.78),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
+                  color: Colors.white.withOpacity(0.86),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
             ),
           ),
           Align(
             alignment: Alignment.bottomCenter,
-            child: MicButton(isRecording: isRecording, onPressed: onMic),
-          ),
-          Positioned(
-            left: 8,
-            bottom: 12,
-            child: _GlassIcon(
-              icon: Icons.photo_camera_outlined,
-              tooltip: 'Camera',
-              onTap: () {},
-            ),
-          ),
-          Positioned(
-            right: 8,
-            bottom: 12,
-            child: _GlassIcon(
-              icon: Icons.restart_alt_rounded,
-              tooltip: 'Replay',
-              onTap: onReplay,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _GlassIcon extends StatelessWidget {
-  const _GlassIcon({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: Colors.white.withOpacity(0.12),
-        shape: const CircleBorder(),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onTap,
-          child: SizedBox(
-            width: 44,
-            height: 44,
-            child: Icon(icon, color: Colors.white.withOpacity(0.72), size: 21),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AvatarStack extends StatelessWidget {
-  const _AvatarStack();
-
-  @override
-  Widget build(BuildContext context) {
-    const colors = [
-      Color(0xFF2F2633),
-      Color(0xFFFFC1A5),
-      Color(0xFF7058C8),
-    ];
-    return SizedBox(
-      width: 82,
-      height: 36,
-      child: Stack(
-        children: [
-          for (var i = 0; i < colors.length; i++)
-            Positioned(
-              left: i * 22,
-              child: Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: colors[i],
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2),
-                ),
-                child: Icon(
-                  Icons.person_rounded,
-                  color: Colors.white.withOpacity(0.9),
-                  size: 18,
-                ),
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.white.withOpacity(0.2),
+                    blurRadius: 30,
+                    spreadRadius: 2,
+                  ),
+                ],
               ),
+              child: MicButton(isRecording: isRecording, onPressed: onMic),
             ),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+class _SoftRing extends StatelessWidget {
+  const _SoftRing({required this.size, required this.opacity});
+
+  final double size;
+  final double opacity;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: Colors.white.withOpacity(opacity),
+          width: 14,
+        ),
       ),
     );
   }
@@ -384,209 +313,6 @@ class _OrbPainter extends CustomPainter {
         size.height - 36,
       );
       canvas.drawOval(rect, stroke);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _PromptMeter extends StatelessWidget {
-  const _PromptMeter();
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(
-          Icons.auto_awesome_rounded,
-          color: AppColors.primaryText(context),
-          size: 18,
-        ),
-        const SizedBox(width: 6),
-        Text(
-          '16 Prompts left',
-          style: TextStyle(
-            color: AppColors.primaryText(context),
-            fontWeight: FontWeight.w800,
-            fontSize: 12,
-          ),
-        ),
-        const Spacer(),
-        Text(
-          'Powered by GPT-5',
-          style: TextStyle(
-            color: AppColors.secondaryText(context),
-            fontSize: 12,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _PromptChips extends StatelessWidget {
-  const _PromptChips();
-
-  @override
-  Widget build(BuildContext context) {
-    const chips = ['Week Summary', 'Create New plan', 'Apply Skill'];
-    return SizedBox(
-      height: 38,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: chips.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final selected = index == 0;
-          return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: selected
-                  ? AppColors.accentPurple
-                  : AppColors.surface(context),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              chips[index],
-              style: TextStyle(
-                color:
-                    selected ? Colors.white : AppColors.secondaryText(context),
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _RoadmapPreview extends StatelessWidget {
-  const _RoadmapPreview();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface(context),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                'Roadmap',
-                style: TextStyle(
-                  color: AppColors.primaryText(context),
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                'Day   Week   Month   Year',
-                style: TextStyle(
-                  color: AppColors.secondaryText(context),
-                  fontSize: 11,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          const Row(
-            children: [
-              Expanded(
-                child: _RoadmapPill(
-                  icon: Icons.lightbulb_outline_rounded,
-                  text: 'Awaken Curiosity',
-                ),
-              ),
-              SizedBox(width: 10),
-              Expanded(
-                child: _RoadmapPill(
-                  icon: Icons.route_rounded,
-                  text: 'Chart Your Path',
-                  striped: true,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          const _RoadmapPill(
-            icon: Icons.school_rounded,
-            text: 'Skill Test',
-            compact: true,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RoadmapPill extends StatelessWidget {
-  const _RoadmapPill({
-    required this.icon,
-    required this.text,
-    this.striped = false,
-    this.compact = false,
-  });
-
-  final IconData icon;
-  final String text;
-  final bool striped;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: striped ? _MiniStripePainter() : null,
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: compact ? 12 : 10,
-          vertical: 9,
-        ),
-        decoration: BoxDecoration(
-          color: striped ? Colors.transparent : AppColors.softSurface(context),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: AppColors.line(context)),
-        ),
-        child: Row(
-          mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
-          children: [
-            Icon(icon, size: 16, color: AppColors.secondaryText(context)),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                text,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: AppColors.secondaryText(context),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MiniStripePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.accentPurple.withOpacity(0.08)
-      ..strokeWidth = 2;
-    for (double x = -size.height; x < size.width + size.height; x += 8) {
-      canvas.drawLine(
-          Offset(x, size.height), Offset(x + size.height, 0), paint);
     }
   }
 
