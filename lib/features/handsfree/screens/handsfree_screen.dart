@@ -69,7 +69,7 @@ class _HandsfreeScreenState extends ConsumerState<HandsfreeScreen>
                       _openSessionSetup(context, controller, state),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 4, 18, 0),
+                  padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
                   child: Align(
                     alignment: Alignment.centerLeft,
                     child: Wrap(
@@ -95,97 +95,36 @@ class _HandsfreeScreenState extends ConsumerState<HandsfreeScreen>
                   ),
                 ),
                 Expanded(
-                  child: Stack(
-                    children: [
-                      AnimatedOpacity(
-                        duration: const Duration(milliseconds: 240),
-                        opacity: state.showTranscript ? 1 : 0,
-                        child: IgnorePointer(
-                          ignoring: !state.showTranscript,
-                          child: ListView(
-                            padding: const EdgeInsets.fromLTRB(18, 18, 18, 210),
-                            children: [
-                              if (lastUserMessage != null)
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: Container(
-                                    margin: const EdgeInsets.only(bottom: 18),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 18,
-                                      vertical: 14,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.14),
-                                      borderRadius: BorderRadius.circular(24),
-                                    ),
-                                    child: Text(
-                                      lastUserMessage.text,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              for (final message in state.messages)
-                                ChatBubble(message: message),
-                              if (state.isThinking)
-                                const Padding(
-                                  padding: EdgeInsets.only(top: 8),
-                                  child: TypingIndicator(
-                                    label: 'Eloq is thinking...',
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      if (!state.showTranscript)
-                        Align(
-                          alignment: const Alignment(0, -0.3),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              _StatusGlass(label: idleLabel),
-                              const SizedBox(height: 18),
-                              Text(
-                                topic.description,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.58),
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      AnimatedAlign(
-                        duration: const Duration(milliseconds: 280),
-                        curve: Curves.easeOutCubic,
-                        alignment: state.showTranscript
-                            ? const Alignment(0, 0.78)
-                            : const Alignment(0, 0.12),
-                        child: GestureDetector(
-                          onTap: controller.toggleTranscript,
-                          child: _VoiceOrb(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 260),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInCubic,
+                    child: state.showTranscript
+                        ? _TranscriptStage(
+                            key: const ValueKey('transcript-stage'),
+                            state: state,
+                            lastUserMessage: lastUserMessage?.text,
                             pulse: _pulse,
-                            large: !state.showTranscript,
+                            onOrbTap: controller.toggleTranscript,
+                          )
+                        : _IdleStage(
+                            key: const ValueKey('idle-stage'),
+                            description: topic.description,
+                            idleLabel: idleLabel,
+                            pulse: _pulse,
                             active: state.isRecording ||
                                 state.isThinking ||
                                 state.isTranscribing,
+                            onOrbTap: controller.toggleTranscript,
                           ),
-                        ),
-                      ),
-                    ],
                   ),
                 ),
                 if (state.error != null)
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 8),
+                    padding: const EdgeInsets.fromLTRB(18, 4, 18, 10),
                     child: Text(
                       state.error!,
+                      textAlign: TextAlign.center,
                       style: const TextStyle(
                         color: AppColors.accentRed,
                         fontWeight: FontWeight.w600,
@@ -198,7 +137,7 @@ class _HandsfreeScreenState extends ConsumerState<HandsfreeScreen>
                     child: TypingIndicator(label: 'Transcribing your audio...'),
                   ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
+                  padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
                   child: Row(
                     children: [
                       _CircleActionButton(
@@ -352,7 +291,8 @@ class _HandsfreeScreenState extends ConsumerState<HandsfreeScreen>
                               ChoiceChip(
                                 selected: selectedTimer == option,
                                 label: Text(
-                                    option == 0 ? 'No timer' : '$option min'),
+                                  option == 0 ? 'No timer' : '$option min',
+                                ),
                                 onSelected: (_) =>
                                     setSheetState(() => selectedTimer = option),
                               ),
@@ -471,6 +411,129 @@ class _HandsfreeScreenState extends ConsumerState<HandsfreeScreen>
   }
 }
 
+class _IdleStage extends StatelessWidget {
+  const _IdleStage({
+    super.key,
+    required this.description,
+    required this.idleLabel,
+    required this.pulse,
+    required this.active,
+    required this.onOrbTap,
+  });
+
+  final String description;
+  final String idleLabel;
+  final Animation<double> pulse;
+  final bool active;
+  final VoidCallback onOrbTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 14, 18, 0),
+      child: Column(
+        children: [
+          const Spacer(flex: 2),
+          _StatusGlass(label: idleLabel),
+          const SizedBox(height: 14),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 240),
+            child: Text(
+              description,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.54),
+                fontSize: 14,
+                height: 1.35,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          const SizedBox(height: 28),
+          GestureDetector(
+            onTap: onOrbTap,
+            child: _VoiceOrb(
+              pulse: pulse,
+              large: true,
+              active: active,
+            ),
+          ),
+          const Spacer(flex: 3),
+        ],
+      ),
+    );
+  }
+}
+
+class _TranscriptStage extends StatelessWidget {
+  const _TranscriptStage({
+    super.key,
+    required this.state,
+    required this.lastUserMessage,
+    required this.pulse,
+    required this.onOrbTap,
+  });
+
+  final HandsfreeState state;
+  final String? lastUserMessage;
+  final Animation<double> pulse;
+  final VoidCallback onOrbTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        ListView(
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 198),
+          children: [
+            if (lastUserMessage != null)
+              Align(
+                alignment: Alignment.centerRight,
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 18),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 14,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.14),
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Text(
+                    lastUserMessage!,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            for (final message in state.messages) ChatBubble(message: message),
+            if (state.isThinking)
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: TypingIndicator(label: 'Eloq is thinking...'),
+              ),
+          ],
+        ),
+        Align(
+          alignment: const Alignment(0, 0.86),
+          child: GestureDetector(
+            onTap: onOrbTap,
+            child: _VoiceOrb(
+              pulse: pulse,
+              large: false,
+              active:
+                  state.isRecording || state.isThinking || state.isTranscribing,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _HandsfreeTopBar extends StatelessWidget {
   const _HandsfreeTopBar({
     required this.title,
@@ -485,29 +548,34 @@ class _HandsfreeTopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
       child: Row(
         children: [
           _CircleActionButton(
             icon: Icons.remove_rounded,
             tooltip: 'Back',
+            compact: true,
             onTap: onBack,
           ),
-          const SizedBox(width: 10),
-          const BrandLogo(size: 34, borderRadius: 12),
-          const SizedBox(width: 10),
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
+          const SizedBox(width: 12),
+          const BrandLogo(size: 40, borderRadius: 14),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              title,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
-          const Spacer(),
+          const SizedBox(width: 12),
           _CircleActionButton(
             icon: Icons.more_vert_rounded,
             tooltip: 'Options',
+            compact: true,
             onTap: onOptions,
           ),
         ],
@@ -528,7 +596,7 @@ class _ModePill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.08),
         borderRadius: BorderRadius.circular(999),
@@ -592,13 +660,13 @@ class _VoiceOrb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = large ? 196.0 : 92.0;
+    final size = large ? 182.0 : 90.0;
 
     return AnimatedBuilder(
       animation: pulse,
       builder: (context, child) {
         final scale =
-            active ? 1 + (pulse.value * 0.06) : 1 + (pulse.value * 0.02);
+            active ? 1 + (pulse.value * 0.05) : 1 + (pulse.value * 0.016);
         return Transform.scale(
           scale: scale,
           child: AnimatedContainer(
@@ -618,9 +686,9 @@ class _VoiceOrb extends StatelessWidget {
               boxShadow: [
                 BoxShadow(
                   color:
-                      const Color(0xFF1A8CFF).withOpacity(active ? 0.46 : 0.28),
-                  blurRadius: active ? 42 : 28,
-                  spreadRadius: active ? 4 : 0,
+                      const Color(0xFF1A8CFF).withOpacity(active ? 0.44 : 0.24),
+                  blurRadius: active ? 36 : 24,
+                  spreadRadius: active ? 3 : 0,
                 ),
               ],
             ),
@@ -634,8 +702,8 @@ class _VoiceOrb extends StatelessWidget {
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                         colors: [
-                          Colors.white.withOpacity(0.55),
-                          Colors.white.withOpacity(0.12),
+                          Colors.white.withOpacity(0.52),
+                          Colors.white.withOpacity(0.1),
                           Colors.transparent,
                         ],
                       ),
@@ -644,15 +712,15 @@ class _VoiceOrb extends StatelessWidget {
                 ),
                 Positioned(
                   left: 18,
-                  top: 30,
+                  top: large ? 30 : 16,
                   child: Container(
-                    width: size * 0.46,
-                    height: size * 0.18,
+                    width: size * 0.42,
+                    height: size * 0.14,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(999),
                       gradient: LinearGradient(
                         colors: [
-                          Colors.white.withOpacity(0.4),
+                          Colors.white.withOpacity(0.38),
                           Colors.white.withOpacity(0.08),
                         ],
                       ),
@@ -682,7 +750,7 @@ class _TypeBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 58,
+      height: 56,
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.08),
         borderRadius: BorderRadius.circular(22),
@@ -730,15 +798,18 @@ class _CircleActionButton extends StatelessWidget {
     required this.tooltip,
     required this.onTap,
     this.filled = false,
+    this.compact = false,
   });
 
   final IconData icon;
   final String tooltip;
   final VoidCallback? onTap;
   final bool filled;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    final size = compact ? 52.0 : 56.0;
     final background = filled
         ? Colors.white
         : onTap == null
@@ -754,12 +825,12 @@ class _CircleActionButton extends StatelessWidget {
           customBorder: const CircleBorder(),
           onTap: onTap,
           child: SizedBox(
-            width: 58,
-            height: 58,
+            width: size,
+            height: size,
             child: Icon(
               icon,
               color: filled ? Colors.black : Colors.white,
-              size: 26,
+              size: compact ? 24 : 26,
             ),
           ),
         ),

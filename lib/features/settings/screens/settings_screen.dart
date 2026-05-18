@@ -47,7 +47,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final usage = ref.watch(usageProvider);
     final premiumUnlocked = _xai.text.trim().isNotEmpty || settings.hasXaiKey;
     final selectedVoiceMode = premiumUnlocked ? settings.voiceMode : 'free';
-    final selectedProviderId = settings.preferredProvider;
     if (settings.isLoaded && !_hydrated) {
       _hydrate(settings);
     }
@@ -80,13 +79,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 const _SectionTitle('Usage today'),
                 _UsageCard(
                   usage: usage,
-                  selectedProviderId: selectedProviderId,
-                  onProviderChanged: (value) {
-                    ref.read(settingsProvider.notifier).update(
-                          (current) =>
-                              current.copyWith(preferredProvider: value),
-                        );
-                  },
+                  settings: settings,
                 ),
                 const SizedBox(height: 20),
                 const _SectionTitle('API keys'),
@@ -477,16 +470,15 @@ class _ChoicePill extends StatelessWidget {
 class _UsageCard extends StatelessWidget {
   const _UsageCard({
     required this.usage,
-    required this.selectedProviderId,
-    required this.onProviderChanged,
+    required this.settings,
   });
 
   final ApiUsage usage;
-  final String selectedProviderId;
-  final ValueChanged<String> onProviderChanged;
+  final AppSettings settings;
 
   @override
   Widget build(BuildContext context) {
+    final selectedProviderId = _resolveUsageProviderId(settings, usage);
     final provider = selectedProviderId == 'auto'
         ? null
         : ApiProviders.byId(selectedProviderId);
@@ -496,6 +488,12 @@ class _UsageCard extends StatelessWidget {
     final practiceMinutesLeft = selectedProviderId == 'groq'
         ? usage.estimatedGroqPracticeMinutesLeft
         : null;
+    final providerLabel = provider?.name ?? 'Auto router';
+    final helperLabel = _helperLabel(
+      selectedProviderId: selectedProviderId,
+      usage: usage,
+      settings: settings,
+    );
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -522,23 +520,61 @@ class _UsageCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            value: selectedProviderId,
-            decoration: const InputDecoration(
-              labelText: 'Preferred API',
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppColors.softSurface(context),
+              borderRadius: BorderRadius.circular(18),
             ),
-            items: const [
-              DropdownMenuItem(value: 'auto', child: Text('Auto router')),
-              DropdownMenuItem(value: 'groq', child: Text('Groq')),
-              DropdownMenuItem(value: 'gemini', child: Text('Gemini')),
-              DropdownMenuItem(value: 'cerebras', child: Text('Cerebras')),
-              DropdownMenuItem(value: 'sambanova', child: Text('SambaNova')),
-              DropdownMenuItem(value: 'openrouter', child: Text('OpenRouter')),
-            ],
-            onChanged: (value) {
-              if (value != null) onProviderChanged(value);
-            },
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        providerLabel,
+                        style: TextStyle(
+                          color: AppColors.primaryText(context),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        helperLabel,
+                        style: TextStyle(
+                          color: AppColors.secondaryText(context),
+                          fontSize: 12,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(
+                      AppColors.isDark(context) ? 0.06 : 0.68,
+                    ),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    selectedProviderId == 'auto' ? 'Dynamic' : 'Active',
+                    style: const TextStyle(
+                      color: AppColors.accentPurple,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 14),
           _UsageLine(
@@ -617,6 +653,64 @@ class _UsageCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _resolveUsageProviderId(AppSettings settings, ApiUsage usage) {
+    final activeProviders = usage.activeProviderIds;
+    if (activeProviders.length > 1) {
+      return 'auto';
+    }
+    if (activeProviders.length == 1) {
+      return activeProviders.first;
+    }
+    if (!settings.isAutoProvider &&
+        _hasKeyForProvider(settings.preferredProvider)) {
+      return settings.preferredProvider;
+    }
+    for (final providerId in const [
+      'groq',
+      'gemini',
+      'cerebras',
+      'sambanova',
+      'openrouter',
+    ]) {
+      if (_hasKeyForProvider(providerId)) {
+        return providerId;
+      }
+    }
+    return 'groq';
+  }
+
+  bool _hasKeyForProvider(String providerId) {
+    return switch (providerId) {
+      'groq' => settings.hasGroqKey,
+      'gemini' => settings.geminiApiKey.trim().isNotEmpty,
+      'cerebras' => settings.cerebrasApiKey.trim().isNotEmpty,
+      'sambanova' => settings.sambanovaApiKey.trim().isNotEmpty,
+      'openrouter' => settings.openRouterApiKey.trim().isNotEmpty,
+      _ => false,
+    };
+  }
+
+  String _helperLabel({
+    required String selectedProviderId,
+    required ApiUsage usage,
+    required AppSettings settings,
+  }) {
+    final activeProviders = usage.activeProviderIds;
+    if (activeProviders.length > 1) {
+      return 'Showing combined usage because the router used multiple providers today.';
+    }
+    if (activeProviders.length == 1) {
+      return 'Showing today\'s live usage from the provider the app actually used.';
+    }
+    if (!settings.hasAnyLlmKey) {
+      return 'Add an API key and this card will automatically track the provider you use.';
+    }
+    if (selectedProviderId == 'groq' && settings.hasGroqKey) {
+      return 'Ready to track Groq first, including Whisper audio and chat usage.';
+    }
+    return 'Ready to track the provider you start using first.';
   }
 
   String _formatTokens(int tokens) {

@@ -95,6 +95,22 @@ class ApiUsage {
     );
   }
 
+  List<String> get activeProviderIds {
+    final providers = <String>{};
+    for (final item in entries.entries) {
+      if (item.value.requests == 0 &&
+          item.value.tokens == 0 &&
+          item.value.audioSeconds == 0) {
+        continue;
+      }
+      final provider = item.key.split(':').first.trim();
+      if (provider.isNotEmpty) {
+        providers.add(provider);
+      }
+    }
+    return providers.toList()..sort();
+  }
+
   ApiUsage increment(
     String key, {
     int requests = 0,

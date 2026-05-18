@@ -55,6 +55,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.14.3
 
 dependency_overrides:
   # record_android 1.5.x expects a newer Flutter Gradle extension that is not
@@ -75,6 +76,14 @@ flutter:
 
   assets:
     - assets/images/eloq_logo.png
+
+flutter_launcher_icons:
+  android: true
+  web:
+    generate: true
+  image_path: assets/images/eloq_logo.png
+  adaptive_icon_background: "#14111D"
+  adaptive_icon_foreground: assets/images/eloq_logo.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

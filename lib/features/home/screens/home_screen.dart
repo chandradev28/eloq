@@ -69,7 +69,7 @@ class HomeScreen extends ConsumerWidget {
                               ),
                         ),
                       ),
-                      _StatusPill(text: progress.level.name),
+                      _StatusPill(text: settings.difficultyLabel),
                     ],
                   ),
                   const SizedBox(height: 22),
