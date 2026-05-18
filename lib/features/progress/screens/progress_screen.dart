@@ -8,18 +8,11 @@ import '../../../core/theme/app_colors.dart';
 import '../../../models/conversation_session.dart';
 import '../../settings/providers/settings_provider.dart';
 
-class ProgressScreen extends ConsumerStatefulWidget {
+class ProgressScreen extends ConsumerWidget {
   const ProgressScreen({super.key});
 
   @override
-  ConsumerState<ProgressScreen> createState() => _ProgressScreenState();
-}
-
-class _ProgressScreenState extends ConsumerState<ProgressScreen> {
-  _TimelineRange _range = _TimelineRange.weeks16;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final progress = ref.watch(progressProvider);
     final sessions = ref.watch(historyProvider);
     final stats = [
@@ -91,11 +84,7 @@ class _ProgressScreenState extends ConsumerState<ProgressScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                _ConsistencyCard(
-                  sessions: sessions,
-                  selectedRange: _range,
-                  onRangeChanged: (range) => setState(() => _range = range),
-                ),
+                _ConsistencyCard(sessions: sessions),
                 const SizedBox(height: 16),
                 GridView.builder(
                   shrinkWrap: true,
@@ -160,33 +149,14 @@ class _ProgressScreenState extends ConsumerState<ProgressScreen> {
   }
 }
 
-enum _TimelineRange {
-  weeks16('16 weeks', 16 * 7),
-  days365('365 days', 365);
-
-  const _TimelineRange(this.label, this.days);
-
-  final String label;
-  final int days;
-}
-
 class _ConsistencyCard extends StatelessWidget {
-  const _ConsistencyCard({
-    required this.sessions,
-    required this.selectedRange,
-    required this.onRangeChanged,
-  });
+  const _ConsistencyCard({required this.sessions});
 
   final List<ConversationSession> sessions;
-  final _TimelineRange selectedRange;
-  final ValueChanged<_TimelineRange> onRangeChanged;
 
   @override
   Widget build(BuildContext context) {
-    final timeline = _CalendarTimeline.fromSessions(
-      sessions: sessions,
-      range: selectedRange,
-    );
+    final calendar = _MonthCalendar.fromSessions(sessions: sessions);
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -205,7 +175,6 @@ class _ConsistencyCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: Column(
@@ -219,7 +188,7 @@ class _ConsistencyCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Your real practice activity, colored by how active each day was.',
+                      'Track your real practice days in a simple monthly view.',
                       style: TextStyle(
                         color: AppColors.secondaryText(context),
                         fontSize: 12,
@@ -230,17 +199,54 @@ class _ConsistencyCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              _RangeToggle(
-                selectedRange: selectedRange,
-                onChanged: onRangeChanged,
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.softSurface(context),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  calendar.monthLabel,
+                  style: const TextStyle(
+                    color: AppColors.accentPurple,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _SummaryTile(
+                  label: 'This week',
+                  value: '${calendar.weekActiveDays}',
+                  helper: 'active days',
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _SummaryTile(
+                  label: 'This month',
+                  value: '${calendar.monthActiveDays}',
+                  helper: 'active days',
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _SummaryTile(
+                  label: 'This year',
+                  value: '${calendar.yearActiveDays}',
+                  helper: 'active days',
+                ),
               ),
             ],
           ),
           const SizedBox(height: 18),
-          if (timeline.columns.isEmpty)
-            const _EmptyCalendar()
-          else
-            _CalendarHeatmap(timeline: timeline),
+          _MonthCalendarGrid(calendar: calendar),
           const SizedBox(height: 14),
           Row(
             children: [
@@ -268,7 +274,7 @@ class _ConsistencyCard extends StatelessWidget {
               ),
               const Spacer(),
               Text(
-                '${timeline.activeDays} active days',
+                '${calendar.monthMinutes} min this month',
                 style: const TextStyle(
                   color: AppColors.accentPurple,
                   fontSize: 12,
@@ -283,132 +289,111 @@ class _ConsistencyCard extends StatelessWidget {
   }
 }
 
-class _RangeToggle extends StatelessWidget {
-  const _RangeToggle({
-    required this.selectedRange,
-    required this.onChanged,
+class _SummaryTile extends StatelessWidget {
+  const _SummaryTile({
+    required this.label,
+    required this.value,
+    required this.helper,
   });
 
-  final _TimelineRange selectedRange;
-  final ValueChanged<_TimelineRange> onChanged;
+  final String label;
+  final String value;
+  final String helper;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
       decoration: BoxDecoration(
         color: AppColors.softSurface(context),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          for (final range in _TimelineRange.values) ...[
-            _TogglePill(
-              label: range.label,
-              selected: selectedRange == range,
-              onTap: () => onChanged(range),
+          Text(
+            label,
+            style: TextStyle(
+              color: AppColors.secondaryText(context),
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
             ),
-            if (range != _TimelineRange.values.last) const SizedBox(width: 4),
-          ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: TextStyle(
+              color: AppColors.primaryText(context),
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              height: 1,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            helper,
+            style: TextStyle(
+              color: AppColors.secondaryText(context),
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _TogglePill extends StatelessWidget {
-  const _TogglePill({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
+class _MonthCalendarGrid extends StatelessWidget {
+  const _MonthCalendarGrid({required this.calendar});
 
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
+  final _MonthCalendar calendar;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: selected ? AppColors.accentPurple : Colors.transparent,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: selected ? Colors.white : AppColors.secondaryText(context),
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
+    const weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
-class _CalendarHeatmap extends StatelessWidget {
-  const _CalendarHeatmap({required this.timeline});
-
-  final _CalendarTimeline timeline;
-
-  static const double _cell = 14;
-  static const double _gap = 5;
-  static const double _columnWidth = _cell + _gap;
-
-  @override
-  Widget build(BuildContext context) {
-    final width = timeline.columns.length * _columnWidth;
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SizedBox(
-        width: width,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      children: [
+        Row(
           children: [
-            Row(
-              children: [
-                for (final column in timeline.columns)
-                  SizedBox(
-                    width: _columnWidth,
+            for (final day in weekDays)
+              Expanded(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
                     child: Text(
-                      column.monthLabel,
+                      day,
                       style: TextStyle(
                         color: AppColors.secondaryText(context),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (final column in timeline.columns)
-                  Padding(
-                    padding: const EdgeInsets.only(right: _gap),
-                    child: Column(
-                      children: [
-                        for (final day in column.days) ...[
-                          _CalendarCell(day: day),
-                          if (day != column.days.last)
-                            const SizedBox(height: _gap),
-                        ],
-                      ],
-                    ),
-                  ),
-              ],
-            ),
+                ),
+              ),
           ],
         ),
-      ),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: calendar.slots.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 7,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 0.94,
+          ),
+          itemBuilder: (context, index) {
+            final slot = calendar.slots[index];
+            if (!slot.hasDate) {
+              return const SizedBox.shrink();
+            }
+            return _CalendarCell(day: slot.day!);
+          },
+        ),
+      ],
     );
   }
 }
@@ -420,24 +405,69 @@ class _CalendarCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final surface = _calendarColor(context, day.intensity);
+    final textColor = day.intensity >= 3
+        ? Colors.white
+        : AppColors.primaryText(context);
+
     return Tooltip(
       message:
-          '${DateFormat('MMM d').format(day.date)} • ${day.minutes} min • ${day.sessions} sessions',
+          '${DateFormat('MMM d').format(day.date)} - ${day.minutes} min - ${day.sessions} sessions',
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(5),
+          borderRadius: BorderRadius.circular(14),
           onTap: () => _showDayDetails(context, day),
           child: Ink(
-            width: 14,
-            height: 14,
             decoration: BoxDecoration(
-              color: _calendarColor(context, day.intensity),
-              borderRadius: BorderRadius.circular(5),
+              color: surface,
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: day.intensity == 0
                     ? AppColors.line(context)
-                    : _calendarColor(context, day.intensity).withOpacity(0.9),
+                    : surface.withOpacity(0.96),
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${day.date.day}',
+                    style: TextStyle(
+                      color: textColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (day.hasPractice)
+                    Row(
+                      children: [
+                        Container(
+                          width: 5,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: textColor,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            '${day.minutes}m',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: textColor.withOpacity(0.9),
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
               ),
             ),
           ),
@@ -452,16 +482,16 @@ class _CalendarCell extends StatelessWidget {
     }
     if (AppColors.isDark(context)) {
       return switch (level) {
-        1 => const Color(0xFF5E3D94),
-        2 => const Color(0xFF7B4AE6),
-        3 => const Color(0xFF9768FF),
-        _ => const Color(0xFFC4A6FF),
+        1 => const Color(0xFF4D356F),
+        2 => const Color(0xFF6A43AB),
+        3 => const Color(0xFF8956E8),
+        _ => const Color(0xFFA871FF),
       };
     }
     return switch (level) {
-      1 => const Color(0xFFE0D3FF),
-      2 => const Color(0xFFC9ABFF),
-      3 => const Color(0xFFA571FF),
+      1 => const Color(0xFFEEE5FF),
+      2 => const Color(0xFFD8C1FF),
+      3 => const Color(0xFFB287FF),
       _ => const Color(0xFF8A4FE8),
     };
   }
@@ -551,16 +581,16 @@ class _LegendSwatch extends StatelessWidget {
     if (level == 0) return AppColors.softSurface(context);
     if (AppColors.isDark(context)) {
       return switch (level) {
-        1 => const Color(0xFF5E3D94),
-        2 => const Color(0xFF7B4AE6),
-        3 => const Color(0xFF9768FF),
-        _ => const Color(0xFFC4A6FF),
+        1 => const Color(0xFF4D356F),
+        2 => const Color(0xFF6A43AB),
+        3 => const Color(0xFF8956E8),
+        _ => const Color(0xFFA871FF),
       };
     }
     return switch (level) {
-      1 => const Color(0xFFE0D3FF),
-      2 => const Color(0xFFC9ABFF),
-      3 => const Color(0xFFA571FF),
+      1 => const Color(0xFFEEE5FF),
+      2 => const Color(0xFFD8C1FF),
+      3 => const Color(0xFFB287FF),
       _ => const Color(0xFF8A4FE8),
     };
   }
@@ -602,52 +632,41 @@ class _DayMetricChip extends StatelessWidget {
   }
 }
 
-class _EmptyCalendar extends StatelessWidget {
-  const _EmptyCalendar();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.softSurface(context),
-        borderRadius: BorderRadius.circular(22),
-      ),
-      child: Text(
-        'Your practice heatmap will appear here after you save a real session.',
-        style: TextStyle(
-          color: AppColors.secondaryText(context),
-          height: 1.35,
-        ),
-      ),
-    );
-  }
-}
-
-class _CalendarTimeline {
-  const _CalendarTimeline({
-    required this.columns,
-    required this.activeDays,
+class _MonthCalendar {
+  const _MonthCalendar({
+    required this.monthLabel,
+    required this.slots,
+    required this.visibleDays,
+    required this.weekActiveDays,
+    required this.monthActiveDays,
+    required this.yearActiveDays,
+    required this.monthMinutes,
   });
 
-  final List<_CalendarColumn> columns;
-  final int activeDays;
+  final String monthLabel;
+  final List<_CalendarSlot> slots;
+  final List<_PracticeDay> visibleDays;
+  final int weekActiveDays;
+  final int monthActiveDays;
+  final int yearActiveDays;
+  final int monthMinutes;
 
-  factory _CalendarTimeline.fromSessions({
+  factory _MonthCalendar.fromSessions({
     required List<ConversationSession> sessions,
-    required _TimelineRange range,
   }) {
     final today = _dateOnly(DateTime.now());
-    final firstRequestedDay =
-        _dateOnly(today.subtract(Duration(days: range.days - 1)));
-    final start = _startOfWeek(firstRequestedDay);
+    final monthStart = DateTime(today.year, today.month, 1);
+    final nextMonthStart = today.month == 12
+        ? DateTime(today.year + 1, 1, 1)
+        : DateTime(today.year, today.month + 1, 1);
+    final monthEnd = nextMonthStart.subtract(const Duration(days: 1));
+    final yearStart = DateTime(today.year, 1, 1);
+    final weekStart = _startOfWeek(today);
     final activity = <DateTime, _PracticeDay>{};
 
     for (final session in sessions) {
       if (session.userTurns == 0) continue;
       final day = _dateOnly(session.updatedAt);
-      if (day.isBefore(firstRequestedDay) || day.isAfter(today)) continue;
       final duration = session.updatedAt.difference(session.startedAt);
       final estimatedMinutes = math.max(
         1,
@@ -670,28 +689,43 @@ class _CalendarTimeline {
       }
     }
 
-    final days = <_PracticeDay>[];
-    for (var date = start;
-        !date.isAfter(today);
+    final monthDays = <_PracticeDay>[];
+    for (var date = monthStart;
+        !date.isAfter(monthEnd);
         date = date.add(const Duration(days: 1))) {
-      days.add(activity[date] ?? _PracticeDay.empty(date));
+      monthDays.add(activity[date] ?? _PracticeDay.empty(date));
     }
 
-    final columns = <_CalendarColumn>[];
-    for (var i = 0; i < days.length; i += 7) {
-      final chunk = days.skip(i).take(7).toList();
-      final firstDay = chunk.first.date;
-      final monthLabel =
-          firstDay.day <= 7 || i == 0 ? DateFormat('MMM').format(firstDay) : '';
-      columns.add(_CalendarColumn(
-        monthLabel: monthLabel,
-        days: chunk,
-      ));
+    final slots = <_CalendarSlot>[];
+    final leading = monthStart.weekday % 7;
+    for (var i = 0; i < leading; i++) {
+      slots.add(const _CalendarSlot.empty());
+    }
+    for (final day in monthDays) {
+      slots.add(_CalendarSlot(day: day));
+    }
+    while (slots.length % 7 != 0) {
+      slots.add(const _CalendarSlot.empty());
     }
 
-    return _CalendarTimeline(
-      columns: columns,
-      activeDays: activity.length,
+    final weekActiveDays = activity.keys
+        .where((day) => !day.isBefore(weekStart) && !day.isAfter(today))
+        .length;
+    final monthActiveDays = monthDays.where((day) => day.hasPractice).length;
+    final yearActiveDays = activity.keys
+        .where((day) => !day.isBefore(yearStart) && !day.isAfter(today))
+        .length;
+    final monthMinutes =
+        monthDays.fold<int>(0, (total, day) => total + day.minutes);
+
+    return _MonthCalendar(
+      monthLabel: DateFormat('MMMM yyyy').format(monthStart),
+      slots: slots,
+      visibleDays: monthDays,
+      weekActiveDays: weekActiveDays,
+      monthActiveDays: monthActiveDays,
+      yearActiveDays: yearActiveDays,
+      monthMinutes: monthMinutes,
     );
   }
 
@@ -705,14 +739,13 @@ class _CalendarTimeline {
   }
 }
 
-class _CalendarColumn {
-  const _CalendarColumn({
-    required this.monthLabel,
-    required this.days,
-  });
+class _CalendarSlot {
+  const _CalendarSlot({this.day});
+  const _CalendarSlot.empty() : day = null;
 
-  final String monthLabel;
-  final List<_PracticeDay> days;
+  final _PracticeDay? day;
+
+  bool get hasDate => day != null;
 }
 
 class _PracticeDay {

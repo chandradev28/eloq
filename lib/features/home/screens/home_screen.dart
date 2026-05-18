@@ -230,65 +230,73 @@ void _showNotifications(BuildContext context) {
   showModalBottomSheet<void>(
     context: context,
     backgroundColor: Colors.transparent,
+    isScrollControlled: true,
     builder: (context) {
-      return SafeArea(
-        child: Container(
-          margin: const EdgeInsets.all(16),
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: AppColors.surface(context),
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: AppColors.line(context)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    'Notifications',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: AppColors.primaryText(context),
-                          fontWeight: FontWeight.w900,
-                        ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    tooltip: 'Close',
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: AppColors.softSurface(context),
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                child: Column(
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 96),
+        child: SafeArea(
+          top: false,
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.surface(context),
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: AppColors.line(context)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    const Icon(
-                      Icons.notifications_none_rounded,
-                      color: AppColors.accentPurple,
-                      size: 34,
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'No notifications yet.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: AppColors.secondaryText(context),
-                        fontWeight: FontWeight.w800,
+                    Expanded(
+                      child: Text(
+                        'Notifications',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              color: AppColors.primaryText(context),
+                              fontWeight: FontWeight.w900,
+                            ),
                       ),
+                    ),
+                    const SizedBox(width: 12),
+                    IconButton(
+                      tooltip: 'Close',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close_rounded),
                     ),
                   ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 18),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: AppColors.softSurface(context),
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                  child: Column(
+                    children: [
+                      const Icon(
+                        Icons.notifications_none_rounded,
+                        color: AppColors.accentPurple,
+                        size: 34,
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'No notifications yet.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppColors.secondaryText(context),
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       );

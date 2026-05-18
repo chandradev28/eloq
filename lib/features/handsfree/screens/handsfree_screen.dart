@@ -18,7 +18,6 @@ class HandsfreeScreen extends ConsumerStatefulWidget {
 
 class _HandsfreeScreenState extends ConsumerState<HandsfreeScreen>
     with SingleTickerProviderStateMixin {
-  final _textController = TextEditingController();
   late final AnimationController _pulse;
 
   @override
@@ -33,7 +32,6 @@ class _HandsfreeScreenState extends ConsumerState<HandsfreeScreen>
   @override
   void dispose() {
     _pulse.dispose();
-    _textController.dispose();
     super.dispose();
   }
 
@@ -143,23 +141,16 @@ class _HandsfreeScreenState extends ConsumerState<HandsfreeScreen>
                     child: TypingIndicator(label: 'Transcribing your audio...'),
                   ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+                  padding: const EdgeInsets.fromLTRB(18, 10, 18, 22),
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Expanded(
-                        child: _TypeBar(
-                          controller: _textController,
-                          enabled: !state.timerFinished,
-                          onSend: () => _sendText(controller),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
                       _CircleActionButton(
                         icon: Icons.volume_up_rounded,
                         tooltip: 'Replay last reply',
                         onTap: controller.replayLastAssistant,
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 18),
                       _CircleActionButton(
                         icon: state.isSessionActive
                             ? Icons.stop_rounded
@@ -172,7 +163,7 @@ class _HandsfreeScreenState extends ConsumerState<HandsfreeScreen>
                             ? null
                             : controller.toggleRecording,
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 18),
                       _CircleActionButton(
                         icon: Icons.close_rounded,
                         tooltip: 'Close',
@@ -405,11 +396,6 @@ class _HandsfreeScreenState extends ConsumerState<HandsfreeScreen>
     resumeController.dispose();
   }
 
-  void _sendText(HandsfreeController controller) {
-    final text = _textController.text;
-    _textController.clear();
-    controller.sendText(text);
-  }
 }
 
 class _IdleStage extends StatelessWidget {
@@ -736,62 +722,6 @@ class _VoiceOrb extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-class _TypeBar extends StatelessWidget {
-  const _TypeBar({
-    required this.controller,
-    required this.enabled,
-    required this.onSend,
-  });
-
-  final TextEditingController controller;
-  final bool enabled;
-  final VoidCallback onSend;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 56,
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: controller,
-              enabled: enabled,
-              textInputAction: TextInputAction.send,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-              ),
-              decoration: InputDecoration(
-                hintText: 'Type',
-                hintStyle: TextStyle(
-                  color: Colors.white.withOpacity(0.45),
-                  fontWeight: FontWeight.w500,
-                ),
-                border: InputBorder.none,
-              ),
-              onSubmitted: (_) => onSend(),
-            ),
-          ),
-          IconButton(
-            tooltip: 'Send text',
-            onPressed: enabled ? onSend : null,
-            icon: const Icon(Icons.arrow_upward_rounded),
-            color: Colors.white,
-          ),
-        ],
-      ),
     );
   }
 }
