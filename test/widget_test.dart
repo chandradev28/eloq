@@ -67,12 +67,11 @@ void main() {
 
     expect(find.text('Learn English\nwith AI.'), findsNothing);
 
-    for (var i = 0;
-        i < 4 && find.text('Save settings').evaluate().isEmpty;
-        i++) {
-      await tester.drag(find.byType(ListView), const Offset(0, -320));
-      await tester.pumpAndSettle();
-    }
+    await tester.scrollUntilVisible(
+      find.text('Save settings'),
+      280,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(find.text('Save settings'));
     await tester.pumpAndSettle();
 

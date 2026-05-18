@@ -481,19 +481,38 @@ class _UsageCard extends StatelessWidget {
     final selectedProviderId = _resolveUsageProviderId(settings, usage);
     final provider = selectedProviderId == 'auto'
         ? null
+        : selectedProviderId == 'none'
+        ? null
         : ApiProviders.byId(selectedProviderId);
     final summary = selectedProviderId == 'auto'
         ? usage.totalSummary
-        : usage.summaryForProvider(selectedProviderId);
+        : selectedProviderId == 'none'
+            ? const ApiUsageSummary(
+                providerId: 'none',
+                requests: 0,
+                tokens: 0,
+                audioSeconds: 0,
+              )
+            : usage.summaryForProvider(selectedProviderId);
     final practiceMinutesLeft = selectedProviderId == 'groq'
         ? usage.estimatedGroqPracticeMinutesLeft
         : null;
-    final providerLabel = provider?.name ?? 'Auto router';
+    final providerLabel = switch (selectedProviderId) {
+      'auto' => 'Auto router',
+      'none' => 'No API connected',
+      _ => provider?.name ?? 'Provider',
+    };
     final helperLabel = _helperLabel(
       selectedProviderId: selectedProviderId,
       usage: usage,
       settings: settings,
     );
+    final status = _providerStatus(
+      selectedProviderId: selectedProviderId,
+      usage: usage,
+      settings: settings,
+    );
+    final statusColor = _statusColor(context, status);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -559,15 +578,15 @@ class _UsageCard extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(
-                      AppColors.isDark(context) ? 0.06 : 0.68,
+                    color: statusColor.withOpacity(
+                      AppColors.isDark(context) ? 0.18 : 0.12,
                     ),
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
-                    selectedProviderId == 'auto' ? 'Dynamic' : 'Active',
-                    style: const TextStyle(
-                      color: AppColors.accentPurple,
+                    status,
+                    style: TextStyle(
+                      color: statusColor,
                       fontSize: 11,
                       fontWeight: FontWeight.w900,
                     ),
@@ -610,7 +629,9 @@ class _UsageCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  provider?.billingLabel ?? 'Mixed usage',
+                  selectedProviderId == 'none'
+                      ? 'Connection status'
+                      : provider?.billingLabel ?? 'Mixed usage',
                   style: TextStyle(
                     color: AppColors.primaryText(context),
                     fontWeight: FontWeight.w900,
@@ -619,8 +640,10 @@ class _UsageCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  provider?.usageSummary ??
-                      'This combines local usage tracked across the providers you have configured.',
+                  selectedProviderId == 'none'
+                      ? 'Add any supported API key below and this card will automatically reflect the provider you are actually using.'
+                      : provider?.usageSummary ??
+                          'This combines local usage tracked across the providers you have configured.',
                   style: TextStyle(
                     color: AppColors.secondaryText(context),
                     fontSize: 12,
@@ -678,7 +701,7 @@ class _UsageCard extends StatelessWidget {
         return providerId;
       }
     }
-    return 'groq';
+    return 'none';
   }
 
   bool _hasKeyForProvider(String providerId) {
@@ -704,6 +727,9 @@ class _UsageCard extends StatelessWidget {
     if (activeProviders.length == 1) {
       return 'Showing today\'s live usage from the provider the app actually used.';
     }
+    if (selectedProviderId == 'none') {
+      return 'No API key saved yet. Add a provider below to activate usage tracking.';
+    }
     if (!settings.hasAnyLlmKey) {
       return 'Add an API key and this card will automatically track the provider you use.';
     }
@@ -711,6 +737,35 @@ class _UsageCard extends StatelessWidget {
       return 'Ready to track Groq first, including Whisper audio and chat usage.';
     }
     return 'Ready to track the provider you start using first.';
+  }
+
+  String _providerStatus({
+    required String selectedProviderId,
+    required ApiUsage usage,
+    required AppSettings settings,
+  }) {
+    if (selectedProviderId == 'auto') {
+      return 'Dynamic';
+    }
+    if (selectedProviderId == 'none' || !settings.hasAnyLlmKey) {
+      return 'Inactive';
+    }
+    if (usage.activeProviderIds.contains(selectedProviderId)) {
+      return 'Active';
+    }
+    if (_hasKeyForProvider(selectedProviderId)) {
+      return 'Ready';
+    }
+    return 'Inactive';
+  }
+
+  Color _statusColor(BuildContext context, String status) {
+    return switch (status) {
+      'Active' => AppColors.accentGreen,
+      'Ready' => AppColors.accentPurple,
+      'Dynamic' => AppColors.accentPurple,
+      _ => AppColors.secondaryText(context),
+    };
   }
 
   String _formatTokens(int tokens) {
