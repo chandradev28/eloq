@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/conversation/screens/conversation_screen.dart';
+import '../../features/handsfree/screens/handsfree_screen.dart';
 import '../../features/history/screens/history_screen.dart';
 import '../../features/home/screens/home_screen.dart';
 import '../../features/onboarding/screens/onboarding_screen.dart';
@@ -76,6 +77,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => ConversationScreen(
           topicId: state.pathParameters['topicId'] ?? 'restaurant',
         ),
+      ),
+      GoRoute(
+        path: '/handsfree',
+        builder: (context, state) => const HandsfreeScreen(),
       ),
     ],
   );

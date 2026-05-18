@@ -36,14 +36,18 @@ class LlmRouterService {
     required Topic topic,
     required List<Message> history,
     required String userText,
+    String extraInstructions = '',
+    String learnerContext = '',
   }) async {
     if (!settings.hasAnyLlmKey) {
-      return _demoResponse(topic, userText);
+      return _demoResponse(topic, userText, settings.difficulty);
     }
 
     final systemPrompt = Prompts.conversationSystemPrompt(
       level: settings.difficulty,
       topic: topic,
+      extraInstructions: extraInstructions,
+      learnerContext: learnerContext,
     );
     final openAiMessages = [
       {'role': 'system', 'content': systemPrompt},
@@ -88,8 +92,12 @@ class LlmRouterService {
         headers: {'HTTP-Referer': 'https://eloq.app'},
       ),
     ];
+    final orderedProviders = _orderProviders(
+      providers,
+      settings.preferredProvider,
+    );
 
-    for (final provider in providers) {
+    for (final provider in orderedProviders) {
       if (!provider.isReady || _isCoolingDown(provider.id)) continue;
       try {
         final raw = provider.isGemini
@@ -111,7 +119,7 @@ class LlmRouterService {
       } catch (_) {}
     }
 
-    final demo = _demoResponse(topic, userText);
+    final demo = _demoResponse(topic, userText, settings.difficulty);
     return LlmResponse(
       text:
           '${demo.text} I could not reach the configured AI providers, so this is a local practice reply.',
@@ -285,11 +293,18 @@ class LlmRouterService {
     return true;
   }
 
-  LlmResponse _demoResponse(Topic topic, String userText) {
+  LlmResponse _demoResponse(Topic topic, String userText, String level) {
     final hasWant = userText.toLowerCase().contains('i want');
+    final response = switch (level) {
+      'advanced' =>
+        'Let us practice ${topic.name.toLowerCase()}. ${topic.prompt} Give me a detailed answer and I will respond naturally.',
+      'intermediate' =>
+        'Let us practice ${topic.name.toLowerCase()}. ${topic.prompt} Answer in a clear, natural way.',
+      _ =>
+        'Let us practice ${topic.name.toLowerCase()}. ${topic.prompt} Use simple English. I will help you.',
+    };
     return LlmResponse(
-      text:
-          'Nice. Let us practice ${topic.name.toLowerCase()}. ${topic.prompt} What would you like to say next?',
+      text: response,
       provider: 'demo',
       model: 'local',
       estimatedTokens: 0,
@@ -311,6 +326,16 @@ class LlmRouterService {
         messages.fold<int>(
             0, (sum, item) => sum + (item['content']?.length ?? 0));
     return (chars / 4).ceil().clamp(1, 100000);
+  }
+
+  List<_ProviderConfig> _orderProviders(
+    List<_ProviderConfig> providers,
+    String preferredProvider,
+  ) {
+    if (preferredProvider == 'auto') return providers;
+    final preferred = providers.where((item) => item.id == preferredProvider);
+    final remaining = providers.where((item) => item.id != preferredProvider);
+    return [...preferred, ...remaining];
   }
 }
 

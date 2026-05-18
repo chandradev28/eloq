@@ -60,6 +60,41 @@ class ApiUsage {
 
   ApiUsageEntry entry(String key) => entries[key] ?? const ApiUsageEntry();
 
+  ApiUsageSummary summaryForProvider(String providerId) {
+    var requests = 0;
+    var tokens = 0;
+    var audioSeconds = 0;
+    for (final item in entries.entries) {
+      if (!item.key.startsWith('$providerId:')) continue;
+      requests += item.value.requests;
+      tokens += item.value.tokens;
+      audioSeconds += item.value.audioSeconds;
+    }
+    return ApiUsageSummary(
+      providerId: providerId,
+      requests: requests,
+      tokens: tokens,
+      audioSeconds: audioSeconds,
+    );
+  }
+
+  ApiUsageSummary get totalSummary {
+    var requests = 0;
+    var tokens = 0;
+    var audioSeconds = 0;
+    for (final item in entries.values) {
+      requests += item.requests;
+      tokens += item.tokens;
+      audioSeconds += item.audioSeconds;
+    }
+    return ApiUsageSummary(
+      providerId: 'auto',
+      requests: requests,
+      tokens: tokens,
+      audioSeconds: audioSeconds,
+    );
+  }
+
   ApiUsage increment(
     String key, {
     int requests = 0,
@@ -120,4 +155,20 @@ class ApiUsage {
             ),
     ).normalizedForToday();
   }
+}
+
+class ApiUsageSummary {
+  const ApiUsageSummary({
+    required this.providerId,
+    required this.requests,
+    required this.tokens,
+    required this.audioSeconds,
+  });
+
+  final String providerId;
+  final int requests;
+  final int tokens;
+  final int audioSeconds;
+
+  int get audioMinutes => (audioSeconds / 60).floor();
 }

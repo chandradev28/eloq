@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/constants/api_providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../models/app_settings.dart';
 import '../../../models/api_usage.dart';
@@ -44,6 +45,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
     final usage = ref.watch(usageProvider);
+    final premiumUnlocked = _xai.text.trim().isNotEmpty || settings.hasXaiKey;
+    final selectedVoiceMode = premiumUnlocked ? settings.voiceMode : 'free';
+    final selectedProviderId = settings.preferredProvider;
     if (settings.isLoaded && !_hydrated) {
       _hydrate(settings);
     }
@@ -74,7 +78,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 const SizedBox(height: 20),
                 const _SectionTitle('Usage today'),
-                _UsageCard(usage: usage),
+                _UsageCard(
+                  usage: usage,
+                  selectedProviderId: selectedProviderId,
+                  onProviderChanged: (value) {
+                    ref.read(settingsProvider.notifier).update(
+                          (current) =>
+                              current.copyWith(preferredProvider: value),
+                        );
+                  },
+                ),
                 const SizedBox(height: 20),
                 const _SectionTitle('API keys'),
                 if (!settings.isLoaded) ...[
@@ -119,37 +132,57 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   validating: _validating.contains('openrouter'),
                   onTest: () => _testKey('openrouter', _openRouter.text),
                 ),
-                _KeyField(controller: _xai, label: 'xAI API key'),
-                const SizedBox(height: 20),
-                const _SectionTitle('Practice'),
-                SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment(value: 'beginner', label: Text('Beginner')),
-                    ButtonSegment(
-                        value: 'intermediate', label: Text('Intermediate')),
-                    ButtonSegment(value: 'advanced', label: Text('Advanced')),
-                  ],
-                  selected: {settings.difficulty},
-                  onSelectionChanged: (selection) {
-                    ref.read(settingsProvider.notifier).update(
-                          (current) =>
-                              current.copyWith(difficulty: selection.first),
-                        );
+                _KeyField(
+                  controller: _xai,
+                  label: 'xAI API key',
+                  helper: 'Unlocks the Premium voice mode option.',
+                  onChanged: (value) {
+                    setState(() {});
                   },
                 ),
-                const SizedBox(height: 16),
-                SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment(value: 'free', label: Text('Free')),
-                    ButtonSegment(value: 'premium', label: Text('Premium')),
+                const SizedBox(height: 20),
+                const _SectionTitle('Practice'),
+                _PracticeModeCard(
+                  title: 'English level',
+                  subtitle: settings.difficultySummary,
+                  children: [
+                    _ChoiceRow(
+                      options: const [
+                        ('beginner', 'Beginner'),
+                        ('intermediate', 'Intermediate'),
+                        ('advanced', 'Advanced'),
+                      ],
+                      selected: settings.difficulty,
+                      onChanged: (value) {
+                        ref.read(settingsProvider.notifier).update(
+                              (current) => current.copyWith(difficulty: value),
+                            );
+                      },
+                    ),
                   ],
-                  selected: {settings.voiceMode},
-                  onSelectionChanged: (selection) {
-                    ref.read(settingsProvider.notifier).update(
-                          (current) =>
-                              current.copyWith(voiceMode: selection.first),
-                        );
-                  },
+                ),
+                const SizedBox(height: 16),
+                _PracticeModeCard(
+                  title: 'Voice mode',
+                  subtitle: premiumUnlocked
+                      ? 'Premium is unlocked because an xAI key is present. Free mode is still the only fully implemented runtime path today.'
+                      : 'Free mode uses Groq Whisper, the router, and device TTS. Add an xAI key to unlock the Premium option.',
+                  children: [
+                    _ChoiceRow(
+                      options: const [
+                        ('free', 'Free'),
+                        ('premium', 'Premium'),
+                      ],
+                      selected: selectedVoiceMode,
+                      onChanged: (value) {
+                        if (value == 'premium' && !premiumUnlocked) return;
+                        ref.read(settingsProvider.notifier).update(
+                              (current) => current.copyWith(voiceMode: value),
+                            );
+                      },
+                      isEnabled: (value) => value == 'free' || premiumUnlocked,
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -197,11 +230,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   icon: const Icon(Icons.file_download_rounded),
                   label: const Text('Export progress'),
                 ),
-                const SizedBox(height: 18),
-                Text(
-                  'Premium xAI voice mode is scaffolded for Phase 4. Free mode uses Groq Whisper, the rotating LLM router, and device TTS.',
-                  style: TextStyle(color: AppColors.secondaryText(context)),
-                ),
               ],
             ),
           ),
@@ -230,6 +258,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             geminiApiKey: _gemini.text,
             openRouterApiKey: _openRouter.text,
             xaiApiKey: _xai.text,
+            voiceMode: _xai.text.trim().isEmpty ? 'free' : current.voiceMode,
           ),
         );
     if (!mounted) return;
@@ -273,6 +302,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       'settings': {
         'difficulty': settings.difficulty,
         'voiceMode': settings.voiceMode,
+        'preferredProvider': settings.preferredProvider,
         'speakingSpeed': settings.speakingSpeed,
         'dailyGoalMinutes': settings.dailyGoalMinutes,
         'isDarkMode': settings.isDarkMode,
@@ -291,14 +321,182 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 }
 
-class _UsageCard extends StatelessWidget {
-  const _UsageCard({required this.usage});
+class _PracticeModeCard extends StatelessWidget {
+  const _PracticeModeCard({
+    required this.title,
+    required this.subtitle,
+    required this.children,
+  });
 
-  final ApiUsage usage;
+  final String title;
+  final String subtitle;
+  final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
-    final audioMinutes = (usage.groqAudioSeconds / 60).floor();
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface(context),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.line(context)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              color: AppColors.primaryText(context),
+              fontWeight: FontWeight.w900,
+              fontSize: 15,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: TextStyle(
+              color: AppColors.secondaryText(context),
+              fontSize: 12,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 14),
+          for (var i = 0; i < children.length; i++) ...[
+            children[i],
+            if (i != children.length - 1) const SizedBox(height: 12),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ChoiceRow extends StatelessWidget {
+  const _ChoiceRow({
+    required this.options,
+    required this.selected,
+    required this.onChanged,
+    this.isEnabled,
+  });
+
+  final List<(String, String)> options;
+  final String selected;
+  final ValueChanged<String> onChanged;
+  final bool Function(String value)? isEnabled;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        for (var i = 0; i < options.length; i++) ...[
+          Expanded(
+            child: _ChoicePill(
+              label: options[i].$2,
+              selected: selected == options[i].$1,
+              enabled: isEnabled?.call(options[i].$1) ?? true,
+              onTap: () => onChanged(options[i].$1),
+            ),
+          ),
+          if (i != options.length - 1) const SizedBox(width: 10),
+        ],
+      ],
+    );
+  }
+}
+
+class _ChoicePill extends StatelessWidget {
+  const _ChoicePill({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.enabled = true,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? AppColors.accentPurple : AppColors.softSurface(context),
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: enabled ? onTap : null,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          height: 48,
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color:
+                  selected ? AppColors.accentPurple : AppColors.line(context),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (!enabled) ...[
+                Icon(
+                  Icons.lock_rounded,
+                  size: 14,
+                  color: AppColors.secondaryText(context),
+                ),
+                const SizedBox(width: 6),
+              ],
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: selected
+                        ? Colors.white
+                        : enabled
+                            ? AppColors.primaryText(context)
+                            : AppColors.secondaryText(context),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _UsageCard extends StatelessWidget {
+  const _UsageCard({
+    required this.usage,
+    required this.selectedProviderId,
+    required this.onProviderChanged,
+  });
+
+  final ApiUsage usage;
+  final String selectedProviderId;
+  final ValueChanged<String> onProviderChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = selectedProviderId == 'auto'
+        ? null
+        : ApiProviders.byId(selectedProviderId);
+    final summary = selectedProviderId == 'auto'
+        ? usage.totalSummary
+        : usage.summaryForProvider(selectedProviderId);
+    final practiceMinutesLeft = selectedProviderId == 'groq'
+        ? usage.estimatedGroqPracticeMinutesLeft
+        : null;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -313,38 +511,145 @@ class _UsageCard extends StatelessWidget {
             children: [
               const Icon(Icons.speed_rounded, color: AppColors.accentPurple),
               const SizedBox(width: 10),
-              Text(
-                'Groq free usage',
-                style: TextStyle(
-                  color: AppColors.primaryText(context),
-                  fontWeight: FontWeight.w900,
+              Expanded(
+                child: Text(
+                  provider?.usageTitle ?? 'Router usage',
+                  style: TextStyle(
+                    color: AppColors.primaryText(context),
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            value: selectedProviderId,
+            decoration: const InputDecoration(
+              labelText: 'Preferred API',
+            ),
+            items: const [
+              DropdownMenuItem(value: 'auto', child: Text('Auto router')),
+              DropdownMenuItem(value: 'groq', child: Text('Groq')),
+              DropdownMenuItem(value: 'gemini', child: Text('Gemini')),
+              DropdownMenuItem(value: 'cerebras', child: Text('Cerebras')),
+              DropdownMenuItem(value: 'sambanova', child: Text('SambaNova')),
+              DropdownMenuItem(value: 'openrouter', child: Text('OpenRouter')),
+            ],
+            onChanged: (value) {
+              if (value != null) onProviderChanged(value);
+            },
+          ),
           const SizedBox(height: 14),
           _UsageLine(
-            label: 'Whisper audio',
-            value: '$audioMinutes / 480 min',
-            progress: usage.groqAudioSeconds / 28800,
-          ),
-          const SizedBox(height: 10),
-          _UsageLine(
-            label: 'Chat tokens',
-            value: '${usage.groqChatTokens} / 100k',
-            progress: usage.groqChatTokens / 100000,
+            label: 'Requests',
+            value: summary.requests.toString(),
+            progress: _requestProgress(selectedProviderId, summary.requests),
           ),
           const SizedBox(height: 12),
-          Text(
-            '~${usage.estimatedGroqPracticeMinutesLeft} min practice left today',
-            style: const TextStyle(
-              color: AppColors.accentPurple,
-              fontWeight: FontWeight.w900,
+          _UsageLine(
+            label: 'Chat tokens',
+            value: _formatTokens(summary.tokens),
+            progress: _tokenProgress(selectedProviderId, summary.tokens),
+          ),
+          if ((provider?.hasAudioTracking ?? false) ||
+              summary.audioSeconds > 0) ...[
+            const SizedBox(height: 12),
+            _UsageLine(
+              label: 'Audio',
+              value: _formatAudio(summary.audioSeconds),
+              progress:
+                  _audioProgress(selectedProviderId, summary.audioSeconds),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.softSurface(context),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  provider?.billingLabel ?? 'Mixed usage',
+                  style: TextStyle(
+                    color: AppColors.primaryText(context),
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  provider?.usageSummary ??
+                      'This combines local usage tracked across the providers you have configured.',
+                  style: TextStyle(
+                    color: AppColors.secondaryText(context),
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
+                ),
+              ],
             ),
           ),
+          if (selectedProviderId == 'gemini') ...[
+            const SizedBox(height: 10),
+            Text(
+              'Remaining Gemini credits are managed in Google AI Studio and are not exposed directly to this app.',
+              style: TextStyle(
+                color: AppColors.secondaryText(context),
+                fontSize: 12,
+                height: 1.35,
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          if (practiceMinutesLeft != null)
+            Text(
+              '~$practiceMinutesLeft min practice left today',
+              style: const TextStyle(
+                color: AppColors.accentPurple,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  String _formatTokens(int tokens) {
+    if (tokens >= 1000) return '${(tokens / 1000).toStringAsFixed(1)}k';
+    return tokens.toString();
+  }
+
+  String _formatAudio(int audioSeconds) {
+    final minutes = (audioSeconds / 60).floor();
+    return '$minutes min';
+  }
+
+  double _requestProgress(String providerId, int requests) {
+    return switch (providerId) {
+      'gemini' => requests / 60,
+      'auto' => requests / 40,
+      _ => requests / 30,
+    };
+  }
+
+  double _tokenProgress(String providerId, int tokens) {
+    return switch (providerId) {
+      'groq' => tokens / 100000,
+      'gemini' => tokens / 50000,
+      _ => tokens / 50000,
+    };
+  }
+
+  double _audioProgress(String providerId, int audioSeconds) {
+    return switch (providerId) {
+      'groq' => audioSeconds / 28800,
+      _ => audioSeconds / 3600,
+    };
   }
 }
 
@@ -482,7 +787,9 @@ class _KeyField extends StatelessWidget {
     required this.controller,
     required this.label,
     this.required = false,
+    this.helper,
     this.onTest,
+    this.onChanged,
     this.status,
     this.validating = false,
   });
@@ -490,7 +797,9 @@ class _KeyField extends StatelessWidget {
   final TextEditingController controller;
   final String label;
   final bool required;
+  final String? helper;
   final VoidCallback? onTest;
+  final ValueChanged<String>? onChanged;
   final String? status;
   final bool validating;
 
@@ -504,8 +813,10 @@ class _KeyField extends StatelessWidget {
           TextField(
             controller: controller,
             obscureText: true,
+            onChanged: onChanged,
             decoration: InputDecoration(
               labelText: required ? '$label (required)' : label,
+              helperText: helper,
               prefixIcon: const Icon(Icons.key_rounded),
               suffixIcon: onTest == null
                   ? null

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/api_providers.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/brand_logo.dart';
 import '../../settings/providers/settings_provider.dart';
 import '../../settings/widgets/api_key_guide.dart';
 
@@ -63,14 +64,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     onChanged: () => setState(() {}),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 20),
                 _Entrance(
                   index: 2,
                   child: _ApiFieldCard(
                     controller: _xaiController,
                     icon: Icons.graphic_eq_rounded,
                     label: 'xAI API key',
-                    helper: 'Optional premium voice features later',
+                    helper:
+                        'Optional key that unlocks Premium mode in Settings.',
                     provider: ApiProviders.xai,
                     onChanged: () => setState(() {}),
                   ),
@@ -114,6 +116,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             groqApiKey: _groqController.text,
             xaiApiKey: _xaiController.text,
             difficulty: _level,
+            voiceMode:
+                _xaiController.text.trim().isEmpty ? 'free' : current.voiceMode,
             hasCompletedOnboarding: true,
           ),
         );
@@ -125,6 +129,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     await ref.read(settingsProvider.notifier).save(
           current.copyWith(
             difficulty: _level,
+            voiceMode: 'free',
             hasCompletedOnboarding: true,
           ),
         );
@@ -194,16 +199,23 @@ class _HeroPanel extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.16),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.mic_rounded, color: Colors.white),
+                  const BrandLogo(
+                    size: 52,
+                    borderRadius: 18,
+                    showShadow: true,
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Eloq',
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                          ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   _SetupPill(
                     text: hasGroqKey ? 'API ready' : 'First setup',
                   ),

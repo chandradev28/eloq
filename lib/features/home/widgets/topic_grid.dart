@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/topics.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../settings/providers/settings_provider.dart';
 
-class TopicGrid extends StatelessWidget {
+class TopicGrid extends ConsumerWidget {
   const TopicGrid({super.key, this.limit});
 
   final int? limit;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
     final topics =
         limit == null ? Topics.all : Topics.all.take(limit!).toList();
     return GridView.builder(
@@ -66,7 +69,7 @@ class TopicGrid extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        topic.difficulty,
+                        settings.difficultyLabel,
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
                               color: AppColors.secondaryText(context),
                               fontWeight: FontWeight.w700,

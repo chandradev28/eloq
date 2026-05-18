@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/constants/topics.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/brand_logo.dart';
 import '../../../models/conversation_session.dart';
 import '../../settings/providers/settings_provider.dart';
+import '../../topics/models/topic.dart';
 import '../widgets/topic_grid.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -97,11 +100,15 @@ class HomeScreen extends ConsumerWidget {
                     goal: settings.dailyGoalMinutes,
                   ),
                   const SizedBox(height: 16),
+                  _HandsfreePracticeCard(
+                    onTap: () => context.push('/handsfree'),
+                  ),
+                  const SizedBox(height: 16),
                   _StripedPracticeCard(
                     title: 'Speaking Practice',
                     subtitle: '${progress.minutesPracticed} minutes practiced',
                     chipText: '${progress.errorsCorrected} corrections',
-                    onTap: () => context.push('/conversation/restaurant'),
+                    onTap: () => _pickPracticeTopic(context),
                   ),
                   const SizedBox(height: 16),
                   _PurpleProgressCard(
@@ -206,6 +213,19 @@ class _DailyGoalCard extends StatelessWidget {
   }
 }
 
+Future<void> _pickPracticeTopic(BuildContext context) async {
+  final selectedTopicId = await showModalBottomSheet<String>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder: (sheetContext) => const _TopicPickerSheet(),
+  );
+  if (selectedTopicId == null || !context.mounted) {
+    return;
+  }
+  context.push('/conversation/$selectedTopicId');
+}
+
 void _showNotifications(BuildContext context) {
   showModalBottomSheet<void>(
     context: context,
@@ -294,6 +314,8 @@ class _HomeTopBar extends StatelessWidget {
           tooltip: 'Menu',
           onTap: onSettings,
         ),
+        const SizedBox(width: 10),
+        const BrandLogo(size: 34, borderRadius: 12),
         const SizedBox(width: 10),
         const Text(
           'Eloq',
@@ -471,54 +493,338 @@ class _StripedPracticeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _DiagonalStripePainter(),
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: AppColors.surface(context).withOpacity(
-            AppColors.isDark(context) ? 0.74 : 0.48,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(28),
+        onTap: onTap,
+        child: CustomPaint(
+          painter: _DiagonalStripePainter(),
+          child: Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: AppColors.surface(context).withOpacity(
+                AppColors.isDark(context) ? 0.74 : 0.48,
+              ),
+              borderRadius: BorderRadius.circular(28),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w900,
+                              height: 1.08,
+                            ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          color: AppColors.secondaryText(context),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _SoftChip(text: chipText),
+                    ],
+                  ),
+                ),
+                IconButton.filled(
+                  tooltip: 'Choose topic',
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppColors.accentPurple,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: onTap,
+                  icon: const Icon(Icons.north_east_rounded),
+                ),
+              ],
+            ),
           ),
-          borderRadius: BorderRadius.circular(28),
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: Column(
+      ),
+    );
+  }
+}
+
+class _HandsfreePracticeCard extends StatelessWidget {
+  const _HandsfreePracticeCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(30),
+        onTap: onTap,
+        child: Container(
+          height: 184,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(30),
+            gradient: const LinearGradient(
+              colors: [
+                Color(0xFF0B0B10),
+                Color(0xFF101827),
+                Color(0xFF0E0E14),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            border: Border.all(color: Colors.white.withOpacity(0.05)),
+          ),
+          child: Stack(
+            children: [
+              const Positioned(
+                left: 0,
+                top: 0,
+                child: _SoftChip(text: 'Handsfree'),
+              ),
+              const Positioned(
+                right: 8,
+                top: 6,
+                child: _HandsfreeOrbPreview(),
+              ),
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const Spacer(),
                   Text(
-                    title,
+                    'Practice via\nspeaking',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: Colors.white,
                           fontWeight: FontWeight.w900,
-                          height: 1.08,
+                          height: 1.04,
                         ),
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    subtitle,
+                    'Voice-first practice with timer, transcript, and custom coach prompt.',
+                    maxLines: 3,
                     style: TextStyle(
-                      color: AppColors.secondaryText(context),
+                      color: Colors.white.withOpacity(0.68),
                       fontSize: 12,
-                      fontWeight: FontWeight.w700,
+                      height: 1.35,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  _SoftChip(text: chipText),
                 ],
               ),
-            ),
-            IconButton.filled(
-              tooltip: 'Start practice',
-              style: IconButton.styleFrom(
-                backgroundColor: AppColors.accentPurple,
-                foregroundColor: Colors.white,
+              const Positioned(
+                right: 0,
+                bottom: 0,
+                child: CircleAvatar(
+                  radius: 22,
+                  backgroundColor: Colors.white,
+                  child: Icon(
+                    Icons.multitrack_audio_rounded,
+                    color: AppColors.accentPurple,
+                  ),
+                ),
               ),
-              onPressed: onTap,
-              icon: const Icon(Icons.north_east_rounded),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HandsfreeOrbPreview extends StatelessWidget {
+  const _HandsfreeOrbPreview();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 112,
+      height: 112,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const RadialGradient(
+          colors: [
+            Color(0xFFDDF8FF),
+            Color(0xFF8DDAFF),
+            Color(0xFF0A75FF),
+          ],
+          stops: [0.1, 0.64, 1],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1A8CFF).withOpacity(0.28),
+            blurRadius: 28,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            left: 16,
+            top: 26,
+            child: Container(
+              width: 52,
+              height: 18,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(999),
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white.withOpacity(0.42),
+                    Colors.white.withOpacity(0.08),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TopicPickerSheet extends StatelessWidget {
+  const _TopicPickerSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    const topics = Topics.all;
+
+    return SafeArea(
+      top: false,
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.78,
+        ),
+        margin: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
+        decoration: BoxDecoration(
+          color: AppColors.surface(context),
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: AppColors.line(context)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Choose a topic',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w900,
+                            ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Pick what you want to practice right now.',
+                        style: TextStyle(
+                          color: AppColors.secondaryText(context),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Close',
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Expanded(
+              child: ListView.separated(
+                itemCount: topics.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (context, index) {
+                  final topic = topics[index];
+                  return _TopicPickerTile(topic: topic);
+                },
+              ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TopicPickerTile extends StatelessWidget {
+  const _TopicPickerTile({required this.topic});
+
+  final Topic topic;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.softSurface(context),
+      borderRadius: BorderRadius.circular(22),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(22),
+        onTap: () => Navigator.of(context).pop(topic.id),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.surface(context),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(topic.icon, color: AppColors.accentPurple),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      topic.name,
+                      style: TextStyle(
+                        color: AppColors.primaryText(context),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      topic.description,
+                      style: TextStyle(
+                        color: AppColors.secondaryText(context),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  _SoftChip(text: topic.difficulty),
+                  const SizedBox(height: 10),
+                  const Icon(
+                    Icons.north_east_rounded,
+                    color: AppColors.accentPurple,
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -209,45 +209,61 @@ class _AssistantPanel extends StatelessWidget {
             child: _AssistantOrb(),
           ),
           Align(
-            alignment: const Alignment(0, 0.14),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.14),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: Colors.white.withOpacity(0.08)),
-              ),
-              child: Text(
-                isRecording
-                    ? 'Listening'
-                    : isTranscribing
-                        ? 'Transcribing'
-                        : 'Ready to practice',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.86),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
+            alignment: const Alignment(0, 0.42),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _PracticeStatusChip(
+                  label: isRecording
+                      ? 'Listening'
+                      : isTranscribing
+                          ? 'Transcribing'
+                          : 'Ready to practice',
                 ),
-              ),
-            ),
-          ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.white.withOpacity(0.2),
-                    blurRadius: 30,
-                    spreadRadius: 2,
+                const SizedBox(height: 16),
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.white.withOpacity(0.2),
+                        blurRadius: 30,
+                        spreadRadius: 2,
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: MicButton(isRecording: isRecording, onPressed: onMic),
+                  child: MicButton(isRecording: isRecording, onPressed: onMic),
+                ),
+              ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _PracticeStatusChip extends StatelessWidget {
+  const _PracticeStatusChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: Colors.white.withOpacity(0.86),
+          fontSize: 13,
+          fontWeight: FontWeight.w900,
+        ),
       ),
     );
   }

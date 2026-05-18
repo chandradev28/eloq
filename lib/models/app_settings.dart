@@ -8,6 +8,7 @@ class AppSettings {
     this.xaiApiKey = '',
     this.difficulty = 'beginner',
     this.voiceMode = 'free',
+    this.preferredProvider = 'auto',
     this.voiceName = '',
     this.speakingSpeed = 1.0,
     this.accent = 'US',
@@ -25,6 +26,7 @@ class AppSettings {
   final String xaiApiKey;
   final String difficulty;
   final String voiceMode;
+  final String preferredProvider;
   final String voiceName;
   final double speakingSpeed;
   final String accent;
@@ -34,12 +36,31 @@ class AppSettings {
   final bool isLoaded;
 
   bool get hasGroqKey => groqApiKey.trim().isNotEmpty;
+  bool get hasXaiKey => xaiApiKey.trim().isNotEmpty;
   bool get hasAnyLlmKey =>
       hasGroqKey ||
       cerebrasApiKey.trim().isNotEmpty ||
       sambanovaApiKey.trim().isNotEmpty ||
       geminiApiKey.trim().isNotEmpty ||
       openRouterApiKey.trim().isNotEmpty;
+
+  String get difficultyLabel => switch (difficulty) {
+        'advanced' => 'Advanced',
+        'intermediate' => 'Intermediate',
+        _ => 'Beginner',
+      };
+
+  bool get isPremiumMode => voiceMode == 'premium';
+  bool get premiumUnlocked => hasXaiKey;
+  bool get isAutoProvider => preferredProvider == 'auto';
+
+  String get difficultySummary => switch (difficulty) {
+        'advanced' =>
+          'Faster replies, richer vocabulary, and more natural complexity.',
+        'intermediate' =>
+          'Balanced vocabulary, moderate pace, and guided conversation.',
+        _ => 'Simpler words, shorter replies, and gentler corrections.',
+      };
 
   AppSettings copyWith({
     String? groqApiKey,
@@ -50,6 +71,7 @@ class AppSettings {
     String? xaiApiKey,
     String? difficulty,
     String? voiceMode,
+    String? preferredProvider,
     String? voiceName,
     double? speakingSpeed,
     String? accent,
@@ -67,6 +89,7 @@ class AppSettings {
       xaiApiKey: xaiApiKey ?? this.xaiApiKey,
       difficulty: difficulty ?? this.difficulty,
       voiceMode: voiceMode ?? this.voiceMode,
+      preferredProvider: preferredProvider ?? this.preferredProvider,
       voiceName: voiceName ?? this.voiceName,
       speakingSpeed: speakingSpeed ?? this.speakingSpeed,
       accent: accent ?? this.accent,
@@ -81,6 +104,7 @@ class AppSettings {
   Map<String, dynamic> toJson() => {
         'difficulty': difficulty,
         'voiceMode': voiceMode,
+        'preferredProvider': preferredProvider,
         'voiceName': voiceName,
         'speakingSpeed': speakingSpeed,
         'accent': accent,
@@ -93,6 +117,7 @@ class AppSettings {
     return AppSettings(
       difficulty: json['difficulty']?.toString() ?? 'beginner',
       voiceMode: json['voiceMode']?.toString() ?? 'free',
+      preferredProvider: json['preferredProvider']?.toString() ?? 'auto',
       voiceName: json['voiceName']?.toString() ?? '',
       speakingSpeed: (json['speakingSpeed'] as num?)?.toDouble() ?? 1.0,
       accent: json['accent']?.toString() ?? 'US',

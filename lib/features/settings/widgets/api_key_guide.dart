@@ -31,7 +31,7 @@ class ApiKeyGuide extends StatelessWidget {
                 title: 'Free providers', providers: ApiProviders.free),
             const SizedBox(height: 12),
             const _ProviderGroup(
-                title: 'Premium voice', providers: ApiProviders.premium),
+                title: 'Premium unlock', providers: ApiProviders.premium),
           ],
         ),
       ),

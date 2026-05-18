@@ -30,6 +30,7 @@ class StorageService {
           ? AppSettings.fromJson(stored)
           : const AppSettings(isLoaded: true);
 
+      final xaiApiKey = await _secureStorage.read(key: 'xaiApiKey') ?? '';
       return base.copyWith(
         groqApiKey: await _secureStorage.read(key: 'groqApiKey') ?? '',
         cerebrasApiKey: await _secureStorage.read(key: 'cerebrasApiKey') ?? '',
@@ -38,7 +39,8 @@ class StorageService {
         geminiApiKey: await _secureStorage.read(key: 'geminiApiKey') ?? '',
         openRouterApiKey:
             await _secureStorage.read(key: 'openRouterApiKey') ?? '',
-        xaiApiKey: await _secureStorage.read(key: 'xaiApiKey') ?? '',
+        xaiApiKey: xaiApiKey,
+        voiceMode: xaiApiKey.trim().isEmpty ? 'free' : base.voiceMode,
         isLoaded: true,
       );
     } catch (_) {

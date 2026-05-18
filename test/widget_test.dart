@@ -51,17 +51,28 @@ void main() {
 
     expect(find.text('Settings'), findsOneWidget);
 
-    await tester.drag(find.byType(ListView), const Offset(0, -450));
-    await tester.pumpAndSettle();
+    for (var i = 0;
+        i < 4 && find.text('Groq API key (required)').evaluate().isEmpty;
+        i++) {
+      await tester.drag(find.byType(ListView), const Offset(0, -220));
+      await tester.pumpAndSettle();
+    }
 
-    final groqField = find.byType(TextField).first;
+    final groqField = find.ancestor(
+      of: find.text('Groq API key (required)'),
+      matching: find.byType(TextField),
+    );
     await tester.enterText(groqField, 'gsk_test_key');
     await tester.pump();
 
     expect(find.text('Learn English\nwith AI.'), findsNothing);
 
-    await tester.drag(find.byType(ListView), const Offset(0, -900));
-    await tester.pumpAndSettle();
+    for (var i = 0;
+        i < 4 && find.text('Save settings').evaluate().isEmpty;
+        i++) {
+      await tester.drag(find.byType(ListView), const Offset(0, -320));
+      await tester.pumpAndSettle();
+    }
     await tester.tap(find.text('Save settings'));
     await tester.pumpAndSettle();
 
