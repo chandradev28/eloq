@@ -18,8 +18,9 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   }
 
   Future<void> save(AppSettings settings) async {
-    state = settings;
-    await _storage.saveSettings(settings);
+    final next = settings.copyWith(isLoaded: true);
+    state = next;
+    await _storage.saveSettings(next);
   }
 
   Future<void> update(

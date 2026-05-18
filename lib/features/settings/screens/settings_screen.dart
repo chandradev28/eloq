@@ -44,7 +44,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
     final usage = ref.watch(usageProvider);
-    if (!_hydrated) {
+    if (settings.isLoaded && !_hydrated) {
       _hydrate(settings);
     }
 
@@ -77,6 +77,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 _UsageCard(usage: usage),
                 const SizedBox(height: 20),
                 const _SectionTitle('API keys'),
+                if (!settings.isLoaded) ...[
+                  const LinearProgressIndicator(minHeight: 3),
+                  const SizedBox(height: 12),
+                ],
                 const ApiKeyGuide(),
                 const SizedBox(height: 16),
                 _KeyField(
@@ -361,12 +365,22 @@ class _UsageLine extends StatelessWidget {
       children: [
         Row(
           children: [
-            Text(
-              label,
-              style: TextStyle(color: AppColors.secondaryText(context)),
+            Expanded(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: AppColors.secondaryText(context)),
+              ),
             ),
-            const Spacer(),
-            Text(value, style: const TextStyle(fontWeight: FontWeight.w800)),
+            const SizedBox(width: 12),
+            Flexible(
+              child: Text(
+                value,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 6),

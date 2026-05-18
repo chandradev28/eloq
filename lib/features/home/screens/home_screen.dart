@@ -387,7 +387,7 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 130,
+      height: 146,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surface(context),
@@ -542,7 +542,7 @@ class _PurpleProgressCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(28),
       onTap: onTap,
       child: Container(
-        height: 136,
+        height: 150,
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(28),

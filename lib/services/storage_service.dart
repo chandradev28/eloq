@@ -26,8 +26,9 @@ class StorageService {
     try {
       final box = await Hive.openBox(_settingsBoxName);
       final stored = box.get(_settingsKey);
-      final base =
-          stored is Map ? AppSettings.fromJson(stored) : const AppSettings();
+      final base = stored is Map
+          ? AppSettings.fromJson(stored)
+          : const AppSettings(isLoaded: true);
 
       return base.copyWith(
         groqApiKey: await _secureStorage.read(key: 'groqApiKey') ?? '',
@@ -38,9 +39,10 @@ class StorageService {
         openRouterApiKey:
             await _secureStorage.read(key: 'openRouterApiKey') ?? '',
         xaiApiKey: await _secureStorage.read(key: 'xaiApiKey') ?? '',
+        isLoaded: true,
       );
     } catch (_) {
-      return const AppSettings();
+      return const AppSettings(isLoaded: true);
     }
   }
 

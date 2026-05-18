@@ -14,6 +14,7 @@ class AppSettings {
     this.isDarkMode = false,
     this.hasCompletedOnboarding = false,
     this.dailyGoalMinutes = 10,
+    this.isLoaded = false,
   });
 
   final String groqApiKey;
@@ -30,6 +31,7 @@ class AppSettings {
   final bool isDarkMode;
   final bool hasCompletedOnboarding;
   final int dailyGoalMinutes;
+  final bool isLoaded;
 
   bool get hasGroqKey => groqApiKey.trim().isNotEmpty;
   bool get hasAnyLlmKey =>
@@ -54,6 +56,7 @@ class AppSettings {
     bool? isDarkMode,
     bool? hasCompletedOnboarding,
     int? dailyGoalMinutes,
+    bool? isLoaded,
   }) {
     return AppSettings(
       groqApiKey: groqApiKey ?? this.groqApiKey,
@@ -71,6 +74,7 @@ class AppSettings {
       hasCompletedOnboarding:
           hasCompletedOnboarding ?? this.hasCompletedOnboarding,
       dailyGoalMinutes: dailyGoalMinutes ?? this.dailyGoalMinutes,
+      isLoaded: isLoaded ?? this.isLoaded,
     );
   }
 
@@ -95,6 +99,7 @@ class AppSettings {
       isDarkMode: json['isDarkMode'] == true,
       hasCompletedOnboarding: json['hasCompletedOnboarding'] == true,
       dailyGoalMinutes: (json['dailyGoalMinutes'] as num?)?.toInt() ?? 10,
+      isLoaded: true,
     );
   }
 }

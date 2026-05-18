@@ -14,17 +14,25 @@ import '../../features/vocabulary/screens/vocabulary_screen.dart';
 import '../theme/app_colors.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
-  final settings = ref.watch(settingsProvider);
+  final onboarding = ref.watch(
+    settingsProvider.select(
+      (settings) => (
+        isLoaded: settings.isLoaded,
+        hasCompleted: settings.hasCompletedOnboarding,
+      ),
+    ),
+  );
 
   return GoRouter(
-    initialLocation: settings.hasCompletedOnboarding ? '/home' : '/onboarding',
+    initialLocation: '/onboarding',
     redirect: (context, state) {
+      if (!onboarding.isLoaded) return null;
       final path = state.uri.path;
       final isOnboarding = path == '/onboarding';
-      if (!settings.hasCompletedOnboarding && !isOnboarding) {
+      if (!onboarding.hasCompleted && !isOnboarding) {
         return '/onboarding';
       }
-      if (settings.hasCompletedOnboarding && isOnboarding) {
+      if (onboarding.hasCompleted && isOnboarding) {
         return '/home';
       }
       return null;

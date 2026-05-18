@@ -30,7 +30,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
-    if (!_hydrated) {
+    if (settings.isLoaded && !_hydrated) {
       _groqController.text = settings.groqApiKey;
       _xaiController.text = settings.xaiApiKey;
       _level = settings.difficulty;
