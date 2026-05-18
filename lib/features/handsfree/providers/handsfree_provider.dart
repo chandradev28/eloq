@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:record/record.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/constants/topics.dart';
@@ -16,9 +17,11 @@ class HandsfreeState {
   const HandsfreeState({
     this.topicId = 'free_talk',
     this.messages = const [],
+    this.isSessionActive = false,
     this.isRecording = false,
     this.isTranscribing = false,
     this.isThinking = false,
+    this.isSpeaking = false,
     this.currentAudioPath,
     this.error,
     this.showTranscript = false,
@@ -32,9 +35,11 @@ class HandsfreeState {
 
   final String topicId;
   final List<Message> messages;
+  final bool isSessionActive;
   final bool isRecording;
   final bool isTranscribing;
   final bool isThinking;
+  final bool isSpeaking;
   final String? currentAudioPath;
   final String? error;
   final bool showTranscript;
@@ -48,9 +53,11 @@ class HandsfreeState {
   HandsfreeState copyWith({
     String? topicId,
     List<Message>? messages,
+    bool? isSessionActive,
     bool? isRecording,
     bool? isTranscribing,
     bool? isThinking,
+    bool? isSpeaking,
     String? currentAudioPath,
     String? error,
     bool? showTranscript,
@@ -66,9 +73,11 @@ class HandsfreeState {
     return HandsfreeState(
       topicId: topicId ?? this.topicId,
       messages: messages ?? this.messages,
+      isSessionActive: isSessionActive ?? this.isSessionActive,
       isRecording: isRecording ?? this.isRecording,
       isTranscribing: isTranscribing ?? this.isTranscribing,
       isThinking: isThinking ?? this.isThinking,
+      isSpeaking: isSpeaking ?? this.isSpeaking,
       currentAudioPath:
           clearAudioPath ? null : currentAudioPath ?? this.currentAudioPath,
       error: clearError ? null : error ?? this.error,
@@ -88,13 +97,24 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
     _seedGreeting();
   }
 
+  static const _voiceThresholdDb = -32.0;
+  static const _silenceHold = Duration(milliseconds: 1400);
+  static const _amplitudeInterval = Duration(milliseconds: 220);
+  static const _maxUtterance = Duration(seconds: 18);
+  static const _minSpeechLength = Duration(milliseconds: 700);
+
   final Ref ref;
   final Uuid _uuid = const Uuid();
   String _sessionId = const Uuid().v4();
   DateTime _startedAt = DateTime.now();
   DateTime? _recordingStartedAt;
+  DateTime? _speechStartedAt;
+  DateTime? _lastVoiceAt;
+  bool _speechDetected = false;
   bool _sessionCounted = false;
+  bool _isStoppingUtterance = false;
   Timer? _timer;
+  StreamSubscription<Amplitude>? _amplitudeSubscription;
 
   void toggleTranscript() {
     state = state.copyWith(showTranscript: !state.showTranscript);
@@ -136,13 +156,10 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
   }
 
   Future<void> clearTranscript() async {
-    await ref.read(audioRecorderServiceProvider).stop();
-    await ref.read(ttsServiceProvider).stop();
+    await _stopHandsfreeSession(resetGreeting: false);
     state = state.copyWith(
       messages: const [],
-      isRecording: false,
-      isTranscribing: false,
-      isThinking: false,
+      isSessionActive: false,
       showTranscript: false,
       clearAudioPath: true,
       clearError: true,
@@ -151,20 +168,25 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
   }
 
   Future<void> startNewSession({String? topicId}) async {
+    await _stopHandsfreeSession(resetGreeting: false);
     _timer?.cancel();
-    await ref.read(audioRecorderServiceProvider).stop();
-    await ref.read(ttsServiceProvider).stop();
     _sessionId = _uuid.v4();
     _startedAt = DateTime.now();
     _recordingStartedAt = null;
+    _speechStartedAt = null;
+    _lastVoiceAt = null;
+    _speechDetected = false;
     _sessionCounted = false;
+    _isStoppingUtterance = false;
 
     state = state.copyWith(
       topicId: topicId ?? state.topicId,
       messages: const [],
+      isSessionActive: false,
       isRecording: false,
       isTranscribing: false,
       isThinking: false,
+      isSpeaking: false,
       showTranscript: false,
       secondsRemaining: _secondsForMinutes(state.timerMinutes),
       isTimerRunning: false,
@@ -176,75 +198,43 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
   }
 
   Future<void> toggleRecording() async {
-    if (state.isRecording) {
-      await stopRecordingAndSend();
-    } else {
-      await startRecording();
+    if (state.isSessionActive) {
+      await _stopHandsfreeSession();
+      return;
     }
+    await startHandsfreeSession();
   }
 
-  Future<void> startRecording() async {
+  Future<void> startHandsfreeSession() async {
     if (state.timerFinished) {
       state = state.copyWith(
         error: 'Timer finished. Start a new voice session to keep practicing.',
       );
       return;
     }
+    if (state.isSessionActive) return;
 
-    final recorder = ref.read(audioRecorderServiceProvider);
-    final hasPermission = await recorder.hasPermission();
-    if (!hasPermission) {
-      state =
-          state.copyWith(error: 'Microphone permission is needed to record.');
-      return;
-    }
-
-    _ensureTimerRunning();
-    final path = await recorder.start();
-    _recordingStartedAt = DateTime.now();
     state = state.copyWith(
-      isRecording: true,
-      currentAudioPath: path,
+      isSessionActive: true,
       clearError: true,
     );
+    await _beginListeningCycle();
   }
 
-  Future<void> stopRecordingAndSend() async {
-    final recorder = ref.read(audioRecorderServiceProvider);
+  Future<void> replayLastAssistant() async {
     final settings = ref.read(settingsProvider);
-    final path = await recorder.stop() ?? state.currentAudioPath;
-    state = state.copyWith(
-      isRecording: false,
-      isTranscribing: true,
-      clearAudioPath: true,
-      clearError: true,
-    );
+    final last = state.messages.where((item) => !item.isUser).lastOrNull;
+    if (last == null) return;
 
-    try {
-      if (path == null || path.isEmpty) {
-        throw StateError('No audio file was captured.');
-      }
-      final text = settings.hasGroqKey
-          ? await ref
-              .read(whisperServiceProvider)
-              .transcribe(apiKey: settings.groqApiKey, filePath: path)
-          : 'I want to keep practicing speaking English.';
-      if (settings.hasGroqKey) {
-        final seconds = DateTime.now()
-            .difference(_recordingStartedAt ?? DateTime.now())
-            .inSeconds
-            .clamp(1, 3600);
-        await ref.read(usageProvider.notifier).trackAudio(
-              provider: 'groq',
-              model: 'whisper-large-v3-turbo',
-              seconds: seconds,
-            );
-      }
-      await sendText(text);
-    } catch (error) {
-      state = state.copyWith(error: error.toString());
-    } finally {
-      state = state.copyWith(isTranscribing: false);
+    await _stopCurrentRecording(discardRecording: true);
+    state = state.copyWith(isSpeaking: true, clearError: true);
+    await ref
+        .read(ttsServiceProvider)
+        .speak(last.text, speed: settings.speakingSpeed);
+    state = state.copyWith(isSpeaking: false);
+
+    if (state.isSessionActive && !state.timerFinished) {
+      await _beginListeningCycle();
     }
   }
 
@@ -258,6 +248,7 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
       return;
     }
 
+    await _stopCurrentRecording(discardRecording: true);
     _ensureTimerRunning();
     final previousMessages = state.messages;
     final userMessage = Message(
@@ -306,21 +297,21 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
           );
       await _countSessionOnce();
       await _saveSession();
+      state = state.copyWith(isSpeaking: true);
       await ref
           .read(ttsServiceProvider)
           .speak(response.text, speed: settings.speakingSpeed);
+      state = state.copyWith(isSpeaking: false);
+      if (state.isSessionActive && !state.timerFinished) {
+        await _beginListeningCycle();
+      }
     } catch (error) {
-      state = state.copyWith(isThinking: false, error: error.toString());
+      state = state.copyWith(
+        isThinking: false,
+        isSpeaking: false,
+        error: error.toString(),
+      );
     }
-  }
-
-  Future<void> replayLastAssistant() async {
-    final settings = ref.read(settingsProvider);
-    final last = state.messages.where((item) => !item.isUser).lastOrNull;
-    if (last == null) return;
-    await ref
-        .read(ttsServiceProvider)
-        .speak(last.text, speed: settings.speakingSpeed);
   }
 
   String formattedRemaining() {
@@ -329,6 +320,184 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
     final seconds = total % 60;
     return '${minutes.toString().padLeft(2, '0')}:'
         '${seconds.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _beginListeningCycle() async {
+    if (!state.isSessionActive ||
+        state.timerFinished ||
+        state.isRecording ||
+        state.isTranscribing ||
+        state.isThinking ||
+        state.isSpeaking) {
+      return;
+    }
+
+    final recorder = ref.read(audioRecorderServiceProvider);
+    final hasPermission = await recorder.hasPermission();
+    if (!hasPermission) {
+      state = state.copyWith(
+        isSessionActive: false,
+        error: 'Microphone permission is needed to start handsfree mode.',
+      );
+      return;
+    }
+
+    _ensureTimerRunning();
+    await _stopCurrentRecording(discardRecording: true);
+    final path = await recorder.start();
+    _recordingStartedAt = DateTime.now();
+    _speechStartedAt = null;
+    _lastVoiceAt = null;
+    _speechDetected = false;
+    _isStoppingUtterance = false;
+    state = state.copyWith(
+      isRecording: true,
+      currentAudioPath: path,
+      clearError: true,
+    );
+
+    await _amplitudeSubscription?.cancel();
+    _amplitudeSubscription = recorder
+        .onAmplitudeChanged(_amplitudeInterval)
+        .listen(_handleAmplitude);
+  }
+
+  void _handleAmplitude(Amplitude amplitude) {
+    if (!_shouldTrackAmplitude) return;
+
+    final now = DateTime.now();
+    final currentDb = amplitude.current;
+    if (currentDb > _voiceThresholdDb) {
+      _speechDetected = true;
+      _speechStartedAt ??= now;
+      _lastVoiceAt = now;
+    }
+
+    final hasTimedOut = _recordingStartedAt != null &&
+        now.difference(_recordingStartedAt!) >= _maxUtterance;
+    final hasNaturalPause = _speechDetected &&
+        _lastVoiceAt != null &&
+        now.difference(_lastVoiceAt!) >= _silenceHold &&
+        _speechStartedAt != null &&
+        now.difference(_speechStartedAt!) >= _minSpeechLength;
+
+    if (hasNaturalPause || hasTimedOut) {
+      unawaited(_finalizeCurrentUtterance());
+    }
+  }
+
+  bool get _shouldTrackAmplitude {
+    return state.isSessionActive &&
+        state.isRecording &&
+        !_isStoppingUtterance &&
+        !state.timerFinished;
+  }
+
+  Future<void> _finalizeCurrentUtterance() async {
+    if (_isStoppingUtterance || !state.isRecording) return;
+    _isStoppingUtterance = true;
+
+    final recorder = ref.read(audioRecorderServiceProvider);
+    final settings = ref.read(settingsProvider);
+    final path = await recorder.stop() ?? state.currentAudioPath;
+    await _amplitudeSubscription?.cancel();
+    _amplitudeSubscription = null;
+
+    state = state.copyWith(
+      isRecording: false,
+      isTranscribing: true,
+      clearAudioPath: true,
+      clearError: true,
+    );
+
+    try {
+      if (path == null || path.isEmpty) {
+        throw StateError('No audio file was captured.');
+      }
+
+      final audioSeconds = DateTime.now()
+          .difference(_recordingStartedAt ?? DateTime.now())
+          .inSeconds
+          .clamp(1, 3600);
+      if (settings.hasGroqKey) {
+        await ref.read(usageProvider.notifier).trackAudio(
+              provider: 'groq',
+              model: 'whisper-large-v3-turbo',
+              seconds: audioSeconds,
+            );
+      }
+
+      final text = settings.hasGroqKey
+          ? await ref
+              .read(whisperServiceProvider)
+              .transcribe(apiKey: settings.groqApiKey, filePath: path)
+          : 'I want to keep practicing speaking English.';
+      state = state.copyWith(isTranscribing: false);
+
+      if (text.trim().length < 2) {
+        if (state.isSessionActive && !state.timerFinished) {
+          await _beginListeningCycle();
+        }
+        return;
+      }
+
+      await sendText(text);
+    } catch (error) {
+      state = state.copyWith(
+        isTranscribing: false,
+        error: error.toString(),
+      );
+    } finally {
+      _recordingStartedAt = null;
+      _speechStartedAt = null;
+      _lastVoiceAt = null;
+      _speechDetected = false;
+      _isStoppingUtterance = false;
+    }
+  }
+
+  Future<void> _stopHandsfreeSession({bool resetGreeting = false}) async {
+    await _stopAudioWork(discardRecording: true);
+    _timer?.cancel();
+    state = state.copyWith(
+      isSessionActive: false,
+      isRecording: false,
+      isTranscribing: false,
+      isThinking: false,
+      isSpeaking: false,
+      isTimerRunning: false,
+      clearAudioPath: true,
+      clearError: true,
+    );
+    if (resetGreeting) {
+      await clearTranscript();
+    }
+  }
+
+  Future<void> _stopAudioWork({required bool discardRecording}) async {
+    await _stopCurrentRecording(discardRecording: discardRecording);
+    await ref.read(ttsServiceProvider).stop();
+  }
+
+  Future<void> _stopCurrentRecording({required bool discardRecording}) async {
+    await _amplitudeSubscription?.cancel();
+    _amplitudeSubscription = null;
+    _isStoppingUtterance = false;
+    _speechDetected = false;
+    _speechStartedAt = null;
+    _lastVoiceAt = null;
+    _recordingStartedAt = null;
+
+    final recorder = ref.read(audioRecorderServiceProvider);
+    if (discardRecording) {
+      await recorder.cancel();
+    } else {
+      await recorder.stop();
+    }
+    state = state.copyWith(
+      isRecording: false,
+      clearAudioPath: true,
+    );
   }
 
   void _seedGreeting() {
@@ -357,11 +526,11 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
     }
     return switch (difficulty) {
       'advanced' =>
-        'Handsfree mode is ready for ${topic.name.toLowerCase()}. Speak naturally and I will keep the conversation moving with rich follow-up questions.',
+        'Handsfree mode is ready for ${topic.name.toLowerCase()}. Tap the mic once, then speak naturally and I will keep the conversation moving.',
       'intermediate' =>
-        'Handsfree mode is ready for ${topic.name.toLowerCase()}. Speak naturally and I will help you continue the conversation.',
+        'Handsfree mode is ready for ${topic.name.toLowerCase()}. Tap the mic once, then speak naturally and I will help you continue.',
       _ =>
-        'Handsfree mode is ready for ${topic.name.toLowerCase()}. Use simple English and I will help you.',
+        'Handsfree mode is ready for ${topic.name.toLowerCase()}. Tap the mic once and speak. I will help you.',
     };
   }
 
@@ -382,7 +551,7 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
       final next = state.secondsRemaining - 1;
       if (next <= 0) {
         timer.cancel();
-        ref.read(ttsServiceProvider).stop();
+        unawaited(_stopHandsfreeSession());
         state = state.copyWith(
           secondsRemaining: 0,
           isTimerRunning: false,
@@ -426,8 +595,7 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
   @override
   void dispose() {
     _timer?.cancel();
-    ref.read(ttsServiceProvider).stop();
-    ref.read(audioRecorderServiceProvider).stop();
+    unawaited(_stopAudioWork(discardRecording: true));
     super.dispose();
   }
 }

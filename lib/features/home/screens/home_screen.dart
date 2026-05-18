@@ -567,7 +567,7 @@ class _HandsfreePracticeCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(30),
         onTap: onTap,
         child: Container(
-          height: 184,
+          height: 204,
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(30),
@@ -582,58 +582,81 @@ class _HandsfreePracticeCard extends StatelessWidget {
             ),
             border: Border.all(color: Colors.white.withOpacity(0.05)),
           ),
-          child: Stack(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Positioned(
-                left: 0,
-                top: 0,
-                child: _SoftChip(text: 'Handsfree'),
-              ),
-              const Positioned(
-                right: 8,
-                top: 6,
-                child: _HandsfreeOrbPreview(),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Spacer(),
-                  Text(
-                    'Practice via\nspeaking',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                          height: 1.04,
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: _SoftChip(text: 'Handsfree'),
+                      ),
+                      const Spacer(),
+                      Text(
+                        'Practice via\nspeaking',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              height: 1.04,
+                            ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Voice-first practice with timer, transcript, and custom coach prompt.',
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.68),
+                          fontSize: 12,
+                          height: 1.35,
+                          fontWeight: FontWeight.w600,
                         ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Voice-first practice with timer, transcript, and custom coach prompt.',
-                    maxLines: 3,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.68),
-                      fontSize: 12,
-                      height: 1.35,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              const Positioned(
-                right: 0,
-                bottom: 0,
-                child: CircleAvatar(
-                  radius: 22,
-                  backgroundColor: Colors.white,
-                  child: Icon(
-                    Icons.multitrack_audio_rounded,
-                    color: AppColors.accentPurple,
+                      ),
+                    ],
                   ),
                 ),
               ),
+              const SizedBox(width: 4),
+              const _HandsfreeVisualColumn(),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _HandsfreeVisualColumn extends StatelessWidget {
+  const _HandsfreeVisualColumn();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      width: 118,
+      child: Column(
+        children: [
+          SizedBox(height: 8),
+          Align(
+            alignment: Alignment.topCenter,
+            child: _HandsfreeOrbPreview(),
+          ),
+          Spacer(),
+          Align(
+            alignment: Alignment.bottomRight,
+            child: CircleAvatar(
+              radius: 20,
+              backgroundColor: Colors.white,
+              child: Icon(
+                Icons.multitrack_audio_rounded,
+                color: AppColors.accentPurple,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -645,8 +668,8 @@ class _HandsfreeOrbPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 112,
-      height: 112,
+      width: 88,
+      height: 88,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: const RadialGradient(

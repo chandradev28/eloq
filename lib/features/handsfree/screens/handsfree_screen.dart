@@ -46,13 +46,17 @@ class _HandsfreeScreenState extends ConsumerState<HandsfreeScreen>
         state.messages.where((item) => item.isUser).lastOrNull;
     final idleLabel = state.timerFinished
         ? 'Session complete'
-        : state.isRecording
-            ? 'Listening'
+        : state.isSpeaking
+            ? 'Speaking'
             : state.isTranscribing
                 ? 'Transcribing'
                 : state.isThinking
                     ? 'Eloq is replying'
-                    : 'Handsfree ready';
+                    : state.isRecording
+                        ? 'Listening'
+                        : state.isSessionActive
+                            ? 'Waiting for you'
+                            : 'Tap mic to start';
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -113,8 +117,10 @@ class _HandsfreeScreenState extends ConsumerState<HandsfreeScreen>
                             idleLabel: idleLabel,
                             pulse: _pulse,
                             active: state.isRecording ||
+                                state.isSpeaking ||
                                 state.isThinking ||
-                                state.isTranscribing,
+                                state.isTranscribing ||
+                                state.isSessionActive,
                             onOrbTap: controller.toggleTranscript,
                           ),
                   ),
@@ -140,13 +146,6 @@ class _HandsfreeScreenState extends ConsumerState<HandsfreeScreen>
                   padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
                   child: Row(
                     children: [
-                      _CircleActionButton(
-                        icon: Icons.add_rounded,
-                        tooltip: 'Session setup',
-                        onTap: () =>
-                            _openSessionSetup(context, controller, state),
-                      ),
-                      const SizedBox(width: 10),
                       Expanded(
                         child: _TypeBar(
                           controller: _textController,
@@ -162,10 +161,12 @@ class _HandsfreeScreenState extends ConsumerState<HandsfreeScreen>
                       ),
                       const SizedBox(width: 10),
                       _CircleActionButton(
-                        icon: state.isRecording
+                        icon: state.isSessionActive
                             ? Icons.stop_rounded
                             : Icons.mic_rounded,
-                        tooltip: state.isRecording ? 'Stop listening' : 'Speak',
+                        tooltip: state.isSessionActive
+                            ? 'End handsfree session'
+                            : 'Start handsfree session',
                         filled: true,
                         onTap: state.timerFinished
                             ? null
@@ -525,7 +526,10 @@ class _TranscriptStage extends StatelessWidget {
               pulse: pulse,
               large: false,
               active:
-                  state.isRecording || state.isThinking || state.isTranscribing,
+                  state.isRecording ||
+                  state.isSpeaking ||
+                  state.isThinking ||
+                  state.isTranscribing,
             ),
           ),
         ),

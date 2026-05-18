@@ -22,7 +22,12 @@ class AudioRecorderService {
 
   Future<String?> stop() => _recorder.stop();
 
+  Future<void> cancel() => _recorder.cancel();
+
   Future<bool> isRecording() => _recorder.isRecording();
+
+  Stream<Amplitude> onAmplitudeChanged(Duration interval) =>
+      _recorder.onAmplitudeChanged(interval);
 
   Future<void> dispose() => _recorder.dispose();
 }
