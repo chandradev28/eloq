@@ -99,7 +99,8 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
     _seedGreeting();
   }
 
-  static const _voiceThresholdDb = -40.0;
+  static const _voiceStartThresholdDb = -38.0;
+  static const _voiceContinueThresholdDb = -45.0;
   static const _silenceHold = Duration(milliseconds: 1400);
   static const _amplitudeInterval = Duration(milliseconds: 220);
   static const _maxUtterance = Duration(seconds: 18);
@@ -115,8 +116,9 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
   bool _speechDetected = false;
   bool _sessionCounted = false;
   bool _isStoppingUtterance = false;
+  bool _isPollingAmplitude = false;
   Timer? _timer;
-  StreamSubscription<Amplitude>? _amplitudeSubscription;
+  Timer? _vadTimer;
 
   void toggleTranscript() {
     state = state.copyWith(showTranscript: !state.showTranscript);
@@ -358,6 +360,7 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
         isSpeaking: false,
         error: error.toString(),
       );
+      await _resumeListeningIfNeeded();
     }
   }
 
@@ -403,10 +406,21 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
       clearError: true,
     );
 
-    await _amplitudeSubscription?.cancel();
-    _amplitudeSubscription = recorder
-        .onAmplitudeChanged(_amplitudeInterval)
-        .listen(_handleAmplitude);
+    _startVadLoop();
+  }
+
+  Future<void> _pollAmplitude() async {
+    if (!_shouldTrackAmplitude || _isPollingAmplitude) return;
+    _isPollingAmplitude = true;
+    try {
+      final recorder = ref.read(audioRecorderServiceProvider);
+      final amplitude = await recorder.getAmplitude();
+      _handleAmplitude(amplitude);
+    } catch (_) {
+      // Keep the handsfree loop alive even if one amplitude sample fails.
+    } finally {
+      _isPollingAmplitude = false;
+    }
   }
 
   void _handleAmplitude(Amplitude amplitude) {
@@ -414,7 +428,10 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
 
     final now = DateTime.now();
     final currentDb = amplitude.current;
-    if (currentDb > _voiceThresholdDb) {
+    final threshold =
+        _speechDetected ? _voiceContinueThresholdDb : _voiceStartThresholdDb;
+
+    if (currentDb > threshold) {
       _speechDetected = true;
       _speechStartedAt ??= now;
       _lastVoiceAt = now;
@@ -454,8 +471,7 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
     final recorder = ref.read(audioRecorderServiceProvider);
     final settings = ref.read(settingsProvider);
     final path = await recorder.stop() ?? state.currentAudioPath;
-    await _amplitudeSubscription?.cancel();
-    _amplitudeSubscription = null;
+    _stopVadLoop();
 
     state = state.copyWith(
       isRecording: false,
@@ -495,6 +511,7 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
               ? 'I could not hear that clearly. Try speaking a little louder.'
               : 'I did not catch that. Try speaking again.',
         );
+        await _resumeListeningIfNeeded();
         return;
       }
 
@@ -505,6 +522,7 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
         showTranscript: true,
         error: error.toString(),
       );
+      await _resumeListeningIfNeeded();
     } finally {
       _recordingStartedAt = null;
       _speechStartedAt = null;
@@ -538,24 +556,52 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
   }
 
   Future<void> _stopCurrentRecording({required bool discardRecording}) async {
-    await _amplitudeSubscription?.cancel();
-    _amplitudeSubscription = null;
+    _stopVadLoop();
     _isStoppingUtterance = false;
+    _isPollingAmplitude = false;
     _speechDetected = false;
     _speechStartedAt = null;
     _lastVoiceAt = null;
     _recordingStartedAt = null;
 
     final recorder = ref.read(audioRecorderServiceProvider);
-    if (discardRecording) {
-      await recorder.cancel();
-    } else {
-      await recorder.stop();
+    if (await recorder.isRecording()) {
+      if (discardRecording) {
+        await recorder.cancel();
+      } else {
+        await recorder.stop();
+      }
     }
     state = state.copyWith(
       isRecording: false,
       clearAudioPath: true,
     );
+  }
+
+  void _startVadLoop() {
+    _stopVadLoop();
+    _vadTimer = Timer.periodic(_amplitudeInterval, (_) {
+      unawaited(_pollAmplitude());
+    });
+  }
+
+  void _stopVadLoop() {
+    _vadTimer?.cancel();
+    _vadTimer = null;
+  }
+
+  Future<void> _resumeListeningIfNeeded() async {
+    if (!state.isSessionActive || state.timerFinished) return;
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    if (!state.isSessionActive ||
+        state.timerFinished ||
+        state.isRecording ||
+        state.isTranscribing ||
+        state.isThinking ||
+        state.isSpeaking) {
+      return;
+    }
+    await _beginListeningCycle();
   }
 
   void _seedGreeting() {
@@ -639,6 +685,7 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
   @override
   void dispose() {
     _timer?.cancel();
+    _stopVadLoop();
     unawaited(_stopAudioWork(discardRecording: true));
     super.dispose();
   }

@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../models/conversation_session.dart';
+import '../../../models/user_progress.dart';
 import '../../settings/providers/settings_provider.dart';
 
 class ProgressScreen extends ConsumerWidget {
@@ -15,6 +16,10 @@ class ProgressScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final progress = ref.watch(progressProvider);
     final sessions = ref.watch(historyProvider);
+    final rank = _ProgressRankSnapshot.from(
+      progress: progress,
+      sessions: sessions,
+    );
     final stats = [
       ('XP', progress.xp.toString(), Icons.star_rounded),
       (
@@ -66,17 +71,54 @@ class ProgressScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        progress.level.name,
+                        'Eloq rank',
+                        style: TextStyle(
+                          color: AppColors.secondaryText(context),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        rank.current.name,
                         style:
                             Theme.of(context).textTheme.headlineSmall?.copyWith(
                                   fontWeight: FontWeight.w900,
                                 ),
                       ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Built from your real practice time, sessions, active days, streak, and corrections.',
+                        style: TextStyle(
+                          color: AppColors.secondaryText(context),
+                          fontSize: 12,
+                          height: 1.35,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _DayMetricChip(
+                            icon: Icons.schedule_rounded,
+                            text: '${progress.minutesPracticed} min',
+                          ),
+                          _DayMetricChip(
+                            icon: Icons.calendar_month_rounded,
+                            text: '${rank.activeDays} active days',
+                          ),
+                          _DayMetricChip(
+                            icon: Icons.forum_rounded,
+                            text: '${progress.totalConversations} sessions',
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 12),
-                      LinearProgressIndicator(value: progress.levelProgress),
+                      LinearProgressIndicator(value: rank.progress),
                       const SizedBox(height: 8),
                       Text(
-                        '${progress.xp} XP toward ${progress.nextLevel.name}',
+                        '${rank.score} training score toward ${rank.next.name}',
                         style:
                             TextStyle(color: AppColors.secondaryText(context)),
                       ),
@@ -795,6 +837,91 @@ class _PracticeDay {
       sessions: sessions ?? this.sessions,
       minutes: minutes ?? this.minutes,
       corrections: corrections ?? this.corrections,
+    );
+  }
+}
+
+class _ProgressRankDefinition {
+  const _ProgressRankDefinition(this.name, this.requiredScore);
+
+  final String name;
+  final int requiredScore;
+}
+
+class _ProgressRankSnapshot {
+  const _ProgressRankSnapshot({
+    required this.current,
+    required this.next,
+    required this.score,
+    required this.progress,
+    required this.activeDays,
+  });
+
+  final _ProgressRankDefinition current;
+  final _ProgressRankDefinition next;
+  final int score;
+  final double progress;
+  final int activeDays;
+
+  static const _ranks = [
+    _ProgressRankDefinition('Beginner', 0),
+    _ProgressRankDefinition('Building', 180),
+    _ProgressRankDefinition('Active', 420),
+    _ProgressRankDefinition('Consistent', 780),
+    _ProgressRankDefinition('Committed', 1220),
+    _ProgressRankDefinition('Focused', 1780),
+    _ProgressRankDefinition('Fluent', 2520),
+    _ProgressRankDefinition('Advanced', 3400),
+    _ProgressRankDefinition('Eloquent', 4600),
+  ];
+
+  factory _ProgressRankSnapshot.from({
+    required UserProgress progress,
+    required List<ConversationSession> sessions,
+  }) {
+    final uniqueDays = <String>{};
+    for (final session in sessions) {
+      if (session.userTurns == 0) continue;
+      final date = session.updatedAt;
+      uniqueDays.add(
+        '${date.year.toString().padLeft(4, '0')}-'
+        '${date.month.toString().padLeft(2, '0')}-'
+        '${date.day.toString().padLeft(2, '0')}',
+      );
+    }
+
+    final activeDays = uniqueDays.length;
+    final score = (progress.minutesPracticed * 4) +
+        (progress.totalConversations * 28) +
+        (progress.errorsCorrected * 6) +
+        (progress.streak * 40) +
+        (activeDays * 52);
+
+    var current = _ranks.first;
+    for (final rank in _ranks) {
+      if (score >= rank.requiredScore) {
+        current = rank;
+      }
+    }
+
+    final next = _ranks.firstWhere(
+      (rank) => rank.requiredScore > score,
+      orElse: () => _ranks.last,
+    );
+
+    final progressValue = current == next
+        ? 1.0
+        : ((score - current.requiredScore) /
+                (next.requiredScore - current.requiredScore))
+            .clamp(0, 1)
+            .toDouble();
+
+    return _ProgressRankSnapshot(
+      current: current,
+      next: next,
+      score: score,
+      progress: progressValue,
+      activeDays: activeDays,
     );
   }
 }

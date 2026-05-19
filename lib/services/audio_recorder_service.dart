@@ -31,6 +31,8 @@ class AudioRecorderService {
 
   Future<bool> isRecording() => _recorder.isRecording();
 
+  Future<Amplitude> getAmplitude() => _recorder.getAmplitude();
+
   Stream<Amplitude> onAmplitudeChanged(Duration interval) =>
       _recorder.onAmplitudeChanged(interval);
 
