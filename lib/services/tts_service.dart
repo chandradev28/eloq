@@ -14,12 +14,15 @@ class TtsService {
   Completer<void>? _speakCompleter;
 
   Future<void> speak(String text, {double speed = 1.0}) async {
-    _speakCompleter?.complete();
-    _speakCompleter = Completer<void>();
+    _finishSpeaking();
+    _speakCompleter = null;
+    await _tts.stop();
+    final completer = Completer<void>();
+    _speakCompleter = completer;
     await _tts.awaitSpeakCompletion(true);
     await _tts.setSpeechRate(speed.clamp(0.5, 2.0));
     await _tts.speak(text);
-    await _speakCompleter?.future;
+    await completer.future;
   }
 
   Future<void> stop() async {
@@ -29,6 +32,7 @@ class TtsService {
 
   void _finishSpeaking() {
     final completer = _speakCompleter;
+    _speakCompleter = null;
     if (completer != null && !completer.isCompleted) {
       completer.complete();
     }

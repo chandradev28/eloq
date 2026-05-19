@@ -500,57 +500,62 @@ class _CalendarCell extends StatelessWidget {
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (context) {
-        return SafeArea(
-          top: false,
-          child: Container(
-            margin: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: AppColors.surface(context),
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: AppColors.line(context)),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  DateFormat('EEEE, MMM d').format(day.date),
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  day.hasPractice
-                      ? 'Saved from your real practice sessions.'
-                      : 'No practice was saved on this day.',
-                  style: TextStyle(
-                    color: AppColors.secondaryText(context),
-                    height: 1.35,
+        final bottomInset = MediaQuery.of(context).padding.bottom;
+        return Padding(
+          padding: EdgeInsets.only(bottom: bottomInset + 96),
+          child: SafeArea(
+            top: false,
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.surface(context),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: AppColors.line(context)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    DateFormat('EEEE, MMM d').format(day.date),
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _DayMetricChip(
-                      icon: Icons.schedule_rounded,
-                      text: '${day.minutes} min',
+                  const SizedBox(height: 6),
+                  Text(
+                    day.hasPractice
+                        ? 'Saved from your real practice sessions.'
+                        : 'No practice was saved on this day.',
+                    style: TextStyle(
+                      color: AppColors.secondaryText(context),
+                      height: 1.35,
                     ),
-                    _DayMetricChip(
-                      icon: Icons.forum_rounded,
-                      text: '${day.sessions} sessions',
-                    ),
-                    _DayMetricChip(
-                      icon: Icons.lightbulb_rounded,
-                      text: '${day.corrections} corrections',
-                    ),
-                  ],
-                ),
-              ],
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _DayMetricChip(
+                        icon: Icons.schedule_rounded,
+                        text: '${day.minutes} min',
+                      ),
+                      _DayMetricChip(
+                        icon: Icons.forum_rounded,
+                        text: '${day.sessions} sessions',
+                      ),
+                      _DayMetricChip(
+                        icon: Icons.lightbulb_rounded,
+                        text: '${day.corrections} corrections',
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         );

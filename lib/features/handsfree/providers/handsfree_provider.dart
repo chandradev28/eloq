@@ -260,6 +260,7 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
     state = state.copyWith(
       messages: [...state.messages, userMessage],
       isThinking: true,
+      showTranscript: true,
       clearError: true,
     );
 
@@ -445,6 +446,7 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
     } catch (error) {
       state = state.copyWith(
         isTranscribing: false,
+        showTranscript: true,
         error: error.toString(),
       );
     } finally {
