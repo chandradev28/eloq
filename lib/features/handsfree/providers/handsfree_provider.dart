@@ -94,19 +94,21 @@ class HandsfreeState {
 
 class HandsfreeController extends StateNotifier<HandsfreeState> {
   HandsfreeController(this.ref) : super(const HandsfreeState()) {
+    final now = DateTime.now();
+    _practiceStartedAt = now;
     _seedGreeting();
   }
 
-  static const _voiceThresholdDb = -32.0;
+  static const _voiceThresholdDb = -40.0;
   static const _silenceHold = Duration(milliseconds: 1400);
   static const _amplitudeInterval = Duration(milliseconds: 220);
   static const _maxUtterance = Duration(seconds: 18);
   static const _minSpeechLength = Duration(milliseconds: 700);
+  static const _noSpeechFallback = Duration(seconds: 6);
 
   final Ref ref;
   final Uuid _uuid = const Uuid();
-  String _sessionId = const Uuid().v4();
-  DateTime _startedAt = DateTime.now();
+  late DateTime _practiceStartedAt;
   DateTime? _recordingStartedAt;
   DateTime? _speechStartedAt;
   DateTime? _lastVoiceAt;
@@ -167,11 +169,42 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
     _seedGreeting();
   }
 
+  Future<void> restoreSession(ConversationSession session) async {
+    await _stopHandsfreeSession(resetGreeting: false);
+    _timer?.cancel();
+    _practiceStartedAt = DateTime.now();
+    _recordingStartedAt = null;
+    _speechStartedAt = null;
+    _lastVoiceAt = null;
+    _speechDetected = false;
+    _sessionCounted = false;
+    _isStoppingUtterance = false;
+
+    state = state.copyWith(
+      topicId: session.topicId,
+      messages: session.messages,
+      isSessionActive: false,
+      isRecording: false,
+      isTranscribing: false,
+      isThinking: false,
+      isSpeaking: false,
+      showTranscript: session.messages.isNotEmpty,
+      secondsRemaining: _secondsForMinutes(state.timerMinutes),
+      isTimerRunning: false,
+      timerFinished: false,
+      clearAudioPath: true,
+      clearError: true,
+    );
+    if (session.messages.isEmpty) {
+      _seedGreeting();
+    }
+  }
+
   Future<void> startNewSession({String? topicId}) async {
     await _stopHandsfreeSession(resetGreeting: false);
     _timer?.cancel();
-    _sessionId = _uuid.v4();
-    _startedAt = DateTime.now();
+    final now = DateTime.now();
+    _practiceStartedAt = now;
     _recordingStartedAt = null;
     _speechStartedAt = null;
     _lastVoiceAt = null;
@@ -198,11 +231,24 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
   }
 
   Future<void> toggleRecording() async {
-    if (state.isSessionActive) {
+    if (state.isRecording) {
+      await submitCurrentTurn();
+      return;
+    }
+    if (state.isTranscribing || state.isThinking || state.isSpeaking) {
       await _stopHandsfreeSession();
       return;
     }
+    if (state.isSessionActive) {
+      await _beginListeningCycle();
+      return;
+    }
     await startHandsfreeSession();
+  }
+
+  Future<void> submitCurrentTurn() async {
+    if (!state.isRecording) return;
+    await _finalizeCurrentUtterance(triggeredByFallback: false);
   }
 
   Future<void> startHandsfreeSession() async {
@@ -285,6 +331,7 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
       state = state.copyWith(
         messages: [...state.messages, assistantMessage],
         isThinking: false,
+        showTranscript: true,
       );
       if (response.provider != 'demo' && response.provider != 'fallback') {
         await ref.read(usageProvider.notifier).trackChat(
@@ -297,7 +344,6 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
             corrections: response.corrections.length,
           );
       await _countSessionOnce();
-      await _saveSession();
       state = state.copyWith(isSpeaking: true);
       await ref
           .read(ttsServiceProvider)
@@ -376,14 +422,19 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
 
     final hasTimedOut = _recordingStartedAt != null &&
         now.difference(_recordingStartedAt!) >= _maxUtterance;
+    final hasFallbackWindow = !_speechDetected &&
+        _recordingStartedAt != null &&
+        now.difference(_recordingStartedAt!) >= _noSpeechFallback;
     final hasNaturalPause = _speechDetected &&
         _lastVoiceAt != null &&
         now.difference(_lastVoiceAt!) >= _silenceHold &&
         _speechStartedAt != null &&
         now.difference(_speechStartedAt!) >= _minSpeechLength;
 
-    if (hasNaturalPause || hasTimedOut) {
-      unawaited(_finalizeCurrentUtterance());
+    if (hasNaturalPause || hasTimedOut || hasFallbackWindow) {
+      unawaited(_finalizeCurrentUtterance(
+        triggeredByFallback: hasFallbackWindow && !_speechDetected,
+      ));
     }
   }
 
@@ -394,7 +445,9 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
         !state.timerFinished;
   }
 
-  Future<void> _finalizeCurrentUtterance() async {
+  Future<void> _finalizeCurrentUtterance({
+    required bool triggeredByFallback,
+  }) async {
     if (_isStoppingUtterance || !state.isRecording) return;
     _isStoppingUtterance = true;
 
@@ -436,9 +489,12 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
       state = state.copyWith(isTranscribing: false);
 
       if (text.trim().length < 2) {
-        if (state.isSessionActive && !state.timerFinished) {
-          await _beginListeningCycle();
-        }
+        state = state.copyWith(
+          showTranscript: true,
+          error: triggeredByFallback
+              ? 'I could not hear that clearly. Try speaking a little louder.'
+              : 'I did not catch that. Try speaking again.',
+        );
         return;
       }
 
@@ -571,25 +627,11 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
     if (_sessionCounted) return;
     _sessionCounted = true;
     final secondsPracticed =
-        DateTime.now().difference(_startedAt).inSeconds.clamp(1, 7200);
+        DateTime.now().difference(_practiceStartedAt).inSeconds.clamp(1, 7200);
     final minutesPracticed = ((secondsPracticed + 59) ~/ 60).clamp(1, 120);
     await ref
         .read(progressProvider.notifier)
         .completeConversation(minutesPracticed: minutesPracticed);
-  }
-
-  Future<void> _saveSession() async {
-    final topic = Topics.byId(state.topicId);
-    final session = ConversationSession(
-      id: _sessionId,
-      topicId: topic.id,
-      topicName: topic.name,
-      startedAt: _startedAt,
-      updatedAt: DateTime.now(),
-      messages: state.messages,
-      provider: 'Handsfree',
-    );
-    await ref.read(historyProvider.notifier).upsert(session);
   }
 
   int _secondsForMinutes(int minutes) => minutes <= 0 ? 0 : minutes * 60;

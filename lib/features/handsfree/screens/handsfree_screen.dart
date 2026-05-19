@@ -5,12 +5,18 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/topics.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/brand_logo.dart';
+import '../../../models/conversation_session.dart';
 import '../../conversation/widgets/chat_bubble.dart';
 import '../../conversation/widgets/typing_indicator.dart';
 import '../providers/handsfree_provider.dart';
 
 class HandsfreeScreen extends ConsumerStatefulWidget {
-  const HandsfreeScreen({super.key});
+  const HandsfreeScreen({
+    super.key,
+    this.session,
+  });
+
+  final ConversationSession? session;
 
   @override
   ConsumerState<HandsfreeScreen> createState() => _HandsfreeScreenState();
@@ -27,6 +33,12 @@ class _HandsfreeScreenState extends ConsumerState<HandsfreeScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1800),
     )..repeat(reverse: true);
+    if (widget.session != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref.read(handsfreeProvider.notifier).restoreSession(widget.session!);
+      });
+    }
   }
 
   @override
@@ -152,12 +164,22 @@ class _HandsfreeScreenState extends ConsumerState<HandsfreeScreen>
                       ),
                       const SizedBox(width: 18),
                       _CircleActionButton(
-                        icon: state.isSessionActive
-                            ? Icons.stop_rounded
-                            : Icons.mic_rounded,
-                        tooltip: state.isSessionActive
-                            ? 'End handsfree session'
-                            : 'Start handsfree session',
+                        icon: state.isRecording
+                            ? Icons.check_rounded
+                            : state.isTranscribing ||
+                                    state.isThinking ||
+                                    state.isSpeaking
+                                ? Icons.stop_rounded
+                                : Icons.mic_rounded,
+                        tooltip: state.isRecording
+                            ? 'Finish this turn'
+                            : state.isTranscribing ||
+                                    state.isThinking ||
+                                    state.isSpeaking
+                                ? 'End handsfree session'
+                                : state.isSessionActive
+                                    ? 'Listen again'
+                                    : 'Start handsfree session',
                         filled: true,
                         onTap: state.timerFinished
                             ? null

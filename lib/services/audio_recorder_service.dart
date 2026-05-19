@@ -12,9 +12,14 @@ class AudioRecorderService {
 
   Future<String> start() async {
     final directory = await getTemporaryDirectory();
-    final path = '${directory.path}/eloq-${const Uuid().v4()}.wav';
+    final path = '${directory.path}/eloq-${const Uuid().v4()}.m4a';
     await _recorder.start(
-      const RecordConfig(encoder: AudioEncoder.wav, sampleRate: 16000),
+      const RecordConfig(
+        encoder: AudioEncoder.aacLc,
+        sampleRate: 16000,
+        numChannels: 1,
+        bitRate: 128000,
+      ),
       path: path,
     );
     return path;

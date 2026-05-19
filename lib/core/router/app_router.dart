@@ -12,6 +12,7 @@ import '../../features/settings/screens/settings_screen.dart';
 import '../../features/settings/providers/settings_provider.dart';
 import '../../features/topics/screens/topics_screen.dart';
 import '../../features/vocabulary/screens/vocabulary_screen.dart';
+import '../../models/conversation_session.dart';
 import '../theme/app_colors.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -74,13 +75,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/conversation/:topicId',
-        builder: (context, state) => ConversationScreen(
-          topicId: state.pathParameters['topicId'] ?? 'restaurant',
-        ),
+        builder: (context, state) {
+          final session =
+              state.extra is ConversationSession ? state.extra as ConversationSession : null;
+          return ConversationScreen(
+            topicId: state.pathParameters['topicId'] ?? 'restaurant',
+            session: session,
+          );
+        },
       ),
       GoRoute(
         path: '/handsfree',
-        builder: (context, state) => const HandsfreeScreen(),
+        builder: (context, state) {
+          final session =
+              state.extra is ConversationSession ? state.extra as ConversationSession : null;
+          return HandsfreeScreen(session: session);
+        },
       ),
     ],
   );

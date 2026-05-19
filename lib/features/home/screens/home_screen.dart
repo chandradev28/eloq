@@ -149,7 +149,10 @@ class HomeScreen extends ConsumerWidget {
                     const _EmptyRecent()
                   else
                     for (final session in sessions.take(3)) ...[
-                      _RecentSessionCard(session: session),
+                      _RecentSessionCard(
+                        session: session,
+                        onTap: () => _resumeSession(context, session),
+                      ),
                       const SizedBox(height: 10),
                     ],
                 ],
@@ -160,6 +163,14 @@ class HomeScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+void _resumeSession(BuildContext context, ConversationSession session) {
+  if (session.provider.toLowerCase() == 'handsfree') {
+    context.push('/handsfree', extra: session);
+    return;
+  }
+  context.push('/conversation/${session.topicId}', extra: session);
 }
 
 class _DailyGoalCard extends StatelessWidget {
@@ -1063,65 +1074,76 @@ class _EmptyRecent extends StatelessWidget {
 }
 
 class _RecentSessionCard extends StatelessWidget {
-  const _RecentSessionCard({required this.session});
+  const _RecentSessionCard({
+    required this.session,
+    required this.onTap,
+  });
 
   final ConversationSession session;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface(context),
+    return Material(
+      color: AppColors.surface(context),
+      borderRadius: BorderRadius.circular(24),
+      child: InkWell(
         borderRadius: BorderRadius.circular(24),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: AppColors.softSurface(context),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.forum_rounded,
-              color: AppColors.accentPurple,
-            ),
+        onTap: onTap,
+        child: Ink(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  session.topicName,
-                  style: TextStyle(
-                    color: AppColors.primaryText(context),
-                    fontWeight: FontWeight.w900,
-                  ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppColors.softSurface(context),
+                  shape: BoxShape.circle,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  '${session.userTurns} turns - ${session.correctionCount} corrections',
-                  style: TextStyle(
-                    color: AppColors.secondaryText(context),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
+                child: const Icon(
+                  Icons.forum_rounded,
+                  color: AppColors.accentPurple,
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      session.topicName,
+                      style: TextStyle(
+                        color: AppColors.primaryText(context),
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${session.userTurns} turns - ${session.correctionCount} corrections',
+                      style: TextStyle(
+                        color: AppColors.secondaryText(context),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                session.provider,
+                style: const TextStyle(
+                  color: AppColors.accentPurple,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                ),
+              ),
+            ],
           ),
-          Text(
-            session.provider,
-            style: const TextStyle(
-              color: AppColors.accentPurple,
-              fontWeight: FontWeight.w800,
-              fontSize: 12,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

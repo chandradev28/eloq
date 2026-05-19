@@ -113,6 +113,11 @@ class StorageService {
     await box.put(session.id, session.toJson());
   }
 
+  Future<void> deleteSession(String sessionId) async {
+    final box = await Hive.openBox(_historyBoxName);
+    await box.delete(sessionId);
+  }
+
   Future<void> clearHistory() async {
     final box = await Hive.openBox(_historyBoxName);
     await box.clear();

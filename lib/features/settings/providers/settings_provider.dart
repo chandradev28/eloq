@@ -124,14 +124,24 @@ class HistoryNotifier extends StateNotifier<List<ConversationSession>> {
   final StorageService _storage;
 
   Future<void> load() async {
-    state = await _storage.readSessions();
+    state = (await _storage.readSessions())
+        .where((session) => session.provider.toLowerCase() != 'handsfree')
+        .toList();
   }
 
   Future<void> upsert(ConversationSession session) async {
+    if (session.provider.toLowerCase() == 'handsfree') {
+      return;
+    }
     await _storage.saveSession(session);
     final remaining = state.where((item) => item.id != session.id).toList();
     state = [session, ...remaining]
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+  }
+
+  Future<void> delete(String sessionId) async {
+    await _storage.deleteSession(sessionId);
+    state = state.where((item) => item.id != sessionId).toList();
   }
 
   Future<void> clear() async {

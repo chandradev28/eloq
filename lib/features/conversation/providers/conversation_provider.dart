@@ -57,15 +57,46 @@ class ConversationController extends StateNotifier<ConversationState> {
     required this.ref,
     required String topicId,
   }) : super(ConversationState(topicId: topicId)) {
+    final now = DateTime.now();
+    _sessionId = _uuid.v4();
+    _practiceStartedAt = now;
+    _historyStartedAt = now;
     _seedGreeting();
   }
 
   final Ref ref;
   final _uuid = const Uuid();
-  late final String _sessionId = _uuid.v4();
-  final DateTime _startedAt = DateTime.now();
+  late String _sessionId;
+  late DateTime _practiceStartedAt;
+  late DateTime _historyStartedAt;
   DateTime? _recordingStartedAt;
   bool _sessionCounted = false;
+
+  Future<void> restoreSession(ConversationSession session) async {
+    await _resetRuntimeState();
+    _sessionId = session.id;
+    _historyStartedAt = session.startedAt;
+    _practiceStartedAt = DateTime.now();
+    _sessionCounted = false;
+    state = ConversationState(
+      topicId: state.topicId,
+      messages: session.messages,
+    );
+    if (session.messages.isEmpty) {
+      _seedGreeting();
+    }
+  }
+
+  Future<void> startNewSession() async {
+    await _resetRuntimeState();
+    final now = DateTime.now();
+    _sessionId = _uuid.v4();
+    _historyStartedAt = now;
+    _practiceStartedAt = now;
+    _sessionCounted = false;
+    state = ConversationState(topicId: state.topicId);
+    _seedGreeting();
+  }
 
   Future<void> toggleRecording() async {
     if (state.isRecording) {
@@ -235,7 +266,7 @@ class ConversationController extends StateNotifier<ConversationState> {
     if (_sessionCounted) return;
     _sessionCounted = true;
     final secondsPracticed =
-        DateTime.now().difference(_startedAt).inSeconds.clamp(1, 7200);
+        DateTime.now().difference(_practiceStartedAt).inSeconds.clamp(1, 7200);
     final minutesPracticed = ((secondsPracticed + 59) ~/ 60).clamp(1, 120);
     await ref
         .read(progressProvider.notifier)
@@ -248,12 +279,21 @@ class ConversationController extends StateNotifier<ConversationState> {
       id: _sessionId,
       topicId: topic.id,
       topicName: topic.name,
-      startedAt: _startedAt,
+      startedAt: _historyStartedAt,
       updatedAt: DateTime.now(),
       messages: state.messages,
       provider: provider,
     );
     await ref.read(historyProvider.notifier).upsert(session);
+  }
+
+  Future<void> _resetRuntimeState() async {
+    final recorder = ref.read(audioRecorderServiceProvider);
+    await ref.read(ttsServiceProvider).stop();
+    if (await recorder.isRecording()) {
+      await recorder.cancel();
+    }
+    _recordingStartedAt = null;
   }
 }
 

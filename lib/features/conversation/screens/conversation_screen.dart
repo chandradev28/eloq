@@ -4,15 +4,21 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/topics.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../models/conversation_session.dart';
 import '../providers/conversation_provider.dart';
 import '../widgets/chat_bubble.dart';
 import '../widgets/mic_button.dart';
 import '../widgets/typing_indicator.dart';
 
 class ConversationScreen extends ConsumerStatefulWidget {
-  const ConversationScreen({super.key, required this.topicId});
+  const ConversationScreen({
+    super.key,
+    required this.topicId,
+    this.session,
+  });
 
   final String topicId;
+  final ConversationSession? session;
 
   @override
   ConsumerState<ConversationScreen> createState() => _ConversationScreenState();
@@ -20,6 +26,19 @@ class ConversationScreen extends ConsumerStatefulWidget {
 
 class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   final _textController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.session != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref
+            .read(conversationProvider(widget.topicId).notifier)
+            .restoreSession(widget.session!);
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -43,6 +62,8 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                 _AssistantTopBar(
                   title: topic.name,
                   onBack: () => context.pop(),
+                  onHistory: () => context.go('/history'),
+                  onNewSession: controller.startNewSession,
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
@@ -127,10 +148,14 @@ class _AssistantTopBar extends StatelessWidget {
   const _AssistantTopBar({
     required this.title,
     required this.onBack,
+    required this.onHistory,
+    required this.onNewSession,
   });
 
   final String title;
   final VoidCallback onBack;
+  final VoidCallback onHistory;
+  final VoidCallback onNewSession;
 
   @override
   Widget build(BuildContext context) {
@@ -154,7 +179,21 @@ class _AssistantTopBar extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 48),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                tooltip: 'History',
+                onPressed: onHistory,
+                icon: const Icon(Icons.history_rounded),
+              ),
+              IconButton(
+                tooltip: 'New session',
+                onPressed: onNewSession,
+                icon: const Icon(Icons.refresh_rounded),
+              ),
+            ],
+          ),
         ],
       ),
     );
