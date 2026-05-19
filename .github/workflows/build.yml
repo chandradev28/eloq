@@ -26,6 +26,11 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Reset pub advisory cache
+        run: |
+          PUB_CACHE_DIR="${PUB_CACHE:-$HOME/.pub-cache}"
+          rm -f "$PUB_CACHE_DIR/hosted/pub.dev/.cache/"*-advisories.json || true
+
       - name: Install dependencies
         run: flutter pub get
 
