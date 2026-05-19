@@ -14,15 +14,35 @@ class LlmResponse {
     required this.text,
     this.provider = 'demo',
     this.model = 'local',
-    this.estimatedTokens = 0,
+    this.promptTokens = 0,
+    this.completionTokens = 0,
+    this.totalTokens = 0,
+    this.isTokenUsageEstimated = true,
     this.corrections = const [],
   });
 
   final String text;
   final String provider;
   final String model;
-  final int estimatedTokens;
+  final int promptTokens;
+  final int completionTokens;
+  final int totalTokens;
+  final bool isTokenUsageEstimated;
   final List<GrammarCorrection> corrections;
+}
+
+class _ProviderResult {
+  const _ProviderResult({
+    required this.text,
+    this.promptTokens = 0,
+    this.completionTokens = 0,
+    this.totalTokens = 0,
+  });
+
+  final String text;
+  final int promptTokens;
+  final int completionTokens;
+  final int totalTokens;
 }
 
 class LlmRouterService {
@@ -38,6 +58,8 @@ class LlmRouterService {
     required String userText,
     String extraInstructions = '',
     String learnerContext = '',
+    int maxOutputTokens = 300,
+    int maxHistoryMessages = 6,
   }) async {
     if (!settings.hasAnyLlmKey) {
       return _demoResponse(topic, userText, settings.difficulty);
@@ -51,7 +73,7 @@ class LlmRouterService {
     );
     final openAiMessages = [
       {'role': 'system', 'content': systemPrompt},
-      ...history.reversed.take(6).toList().reversed.map((message) => {
+      ...history.reversed.take(maxHistoryMessages).toList().reversed.map((message) => {
             'role': message.isUser ? 'user' : 'assistant',
             'content': message.text,
           }),
@@ -100,14 +122,31 @@ class LlmRouterService {
     for (final provider in orderedProviders) {
       if (!provider.isReady || _isCoolingDown(provider.id)) continue;
       try {
-        final raw = provider.isGemini
-            ? await _sendGemini(provider, systemPrompt, history, userText)
-            : await _sendOpenAiCompatible(provider, openAiMessages);
+        final result = provider.isGemini
+            ? await _sendGemini(
+                provider,
+                systemPrompt,
+                history,
+                userText,
+                maxOutputTokens: maxOutputTokens,
+                maxHistoryMessages: maxHistoryMessages,
+              )
+            : await _sendOpenAiCompatible(
+                provider,
+                openAiMessages,
+                maxOutputTokens: maxOutputTokens,
+              );
+        final exactTotalTokens = result.totalTokens;
         return _parseResponse(
-          raw,
+          result.text,
           provider.id,
           provider.model,
-          _estimateTokens(openAiMessages, raw),
+          promptTokens: result.promptTokens,
+          completionTokens: result.completionTokens,
+          totalTokens: exactTotalTokens > 0
+              ? exactTotalTokens
+              : _estimateTokens(openAiMessages, result.text),
+          isTokenUsageEstimated: exactTotalTokens <= 0,
         );
       } on DioException catch (error) {
         final status = error.response?.statusCode ?? 0;
@@ -172,11 +211,22 @@ class LlmRouterService {
       };
       if (config == null) return 'Unknown provider.';
       if (config.isGemini) {
-        await _sendGemini(config, 'Reply with OK.', const [], 'OK');
+        await _sendGemini(
+          config,
+          'Reply with OK.',
+          const [],
+          'OK',
+          maxOutputTokens: 32,
+          maxHistoryMessages: 1,
+        );
       } else {
-        await _sendOpenAiCompatible(config, const [
-          {'role': 'user', 'content': 'Reply with OK.'},
-        ]);
+        await _sendOpenAiCompatible(
+          config,
+          const [
+            {'role': 'user', 'content': 'Reply with OK.'},
+          ],
+          maxOutputTokens: 32,
+        );
       }
       return null;
     } on DioException catch (error) {
@@ -186,10 +236,11 @@ class LlmRouterService {
     }
   }
 
-  Future<String> _sendOpenAiCompatible(
+  Future<_ProviderResult> _sendOpenAiCompatible(
     _ProviderConfig provider,
-    List<Map<String, String>> messages,
-  ) async {
+    List<Map<String, String>> messages, {
+    required int maxOutputTokens,
+  }) async {
     final response = await _dio.post<Map<String, dynamic>>(
       '${provider.baseUrl}/chat/completions',
       options: Options(
@@ -203,23 +254,32 @@ class LlmRouterService {
         'model': provider.model,
         'messages': messages,
         'temperature': 0.7,
-        'max_tokens': 300,
+        'max_tokens': maxOutputTokens,
         'stream': false,
       },
     );
 
-    return response.data?['choices']?[0]?['message']?['content']?.toString() ??
-        'I am here. Could you say that again?';
+    final usage = response.data?['usage'];
+    return _ProviderResult(
+      text: response.data?['choices']?[0]?['message']?['content']?.toString() ??
+          'I am here. Could you say that again?',
+      promptTokens: _asInt(usage?['prompt_tokens']),
+      completionTokens: _asInt(usage?['completion_tokens']),
+      totalTokens: _asInt(usage?['total_tokens']),
+    );
   }
 
-  Future<String> _sendGemini(
+  Future<_ProviderResult> _sendGemini(
     _ProviderConfig provider,
     String systemPrompt,
     List<Message> history,
-    String userText,
-  ) async {
+    String userText, {
+    required int maxOutputTokens,
+    required int maxHistoryMessages,
+  }) async {
     final transcript = StringBuffer(systemPrompt);
-    for (final message in history.reversed.take(6).toList().reversed) {
+    for (final message
+        in history.reversed.take(maxHistoryMessages).toList().reversed) {
       transcript
           .writeln('${message.isUser ? 'Student' : 'Eloq'}: ${message.text}');
     }
@@ -235,21 +295,34 @@ class LlmRouterService {
             ]
           }
         ],
-        'generationConfig': {'temperature': 0.7, 'maxOutputTokens': 300},
+        'generationConfig': {
+          'temperature': 0.7,
+          'maxOutputTokens': maxOutputTokens,
+        },
       },
     );
 
-    return response.data?['candidates']?[0]?['content']?['parts']?[0]?['text']
-            ?.toString() ??
-        'I am here. Could you say that again?';
+    final usage = response.data?['usageMetadata'];
+    return _ProviderResult(
+      text: response.data?['candidates']?[0]?['content']?['parts']?[0]?['text']
+              ?.toString() ??
+          'I am here. Could you say that again?',
+      promptTokens: _asInt(usage?['promptTokenCount']),
+      completionTokens: _asInt(usage?['candidatesTokenCount']),
+      totalTokens: _asInt(usage?['totalTokenCount']),
+    );
   }
 
   LlmResponse _parseResponse(
     String raw,
     String provider,
     String model,
-    int estimatedTokens,
-  ) {
+    {
+    required int promptTokens,
+    required int completionTokens,
+    required int totalTokens,
+    required bool isTokenUsageEstimated,
+  }) {
     const start = '|||CORRECTIONS|||';
     const end = '|||END|||';
     final startIndex = raw.indexOf(start);
@@ -259,7 +332,10 @@ class LlmRouterService {
         text: raw.trim(),
         provider: provider,
         model: model,
-        estimatedTokens: estimatedTokens,
+        promptTokens: promptTokens,
+        completionTokens: completionTokens,
+        totalTokens: totalTokens,
+        isTokenUsageEstimated: isTokenUsageEstimated,
       );
     }
 
@@ -278,7 +354,10 @@ class LlmRouterService {
       text: spokenText,
       provider: provider,
       model: model,
-      estimatedTokens: estimatedTokens,
+      promptTokens: promptTokens,
+      completionTokens: completionTokens,
+      totalTokens: totalTokens,
+      isTokenUsageEstimated: isTokenUsageEstimated,
       corrections: corrections,
     );
   }
@@ -307,7 +386,8 @@ class LlmRouterService {
       text: response,
       provider: 'demo',
       model: 'local',
-      estimatedTokens: 0,
+      totalTokens: 0,
+      isTokenUsageEstimated: true,
       corrections: hasWant
           ? const [
               GrammarCorrection(
@@ -326,6 +406,13 @@ class LlmRouterService {
         messages.fold<int>(
             0, (sum, item) => sum + (item['content']?.length ?? 0));
     return (chars / 4).ceil().clamp(1, 100000);
+  }
+
+  int _asInt(Object? value) {
+    return switch (value) {
+      num number => number.toInt(),
+      _ => 0,
+    };
   }
 
   List<_ProviderConfig> _orderProviders(

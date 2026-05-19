@@ -204,7 +204,10 @@ class ConversationController extends StateNotifier<ConversationState> {
         await ref.read(usageProvider.notifier).trackChat(
               provider: response.provider,
               model: response.model,
-              estimatedTokens: response.estimatedTokens,
+              promptTokens: response.promptTokens,
+              completionTokens: response.completionTokens,
+              totalTokens: response.totalTokens,
+              isEstimated: response.isTokenUsageEstimated,
             );
       }
       await ref.read(progressProvider.notifier).addMessageXp(

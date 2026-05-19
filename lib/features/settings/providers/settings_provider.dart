@@ -88,12 +88,18 @@ class UsageNotifier extends StateNotifier<ApiUsage> {
   Future<void> trackChat({
     required String provider,
     required String model,
-    required int estimatedTokens,
+    required int totalTokens,
+    int promptTokens = 0,
+    int completionTokens = 0,
+    bool isEstimated = false,
   }) async {
     state = state.normalizedForToday().increment(
           '$provider:$model',
           requests: 1,
-          tokens: estimatedTokens,
+          promptTokens: isEstimated ? 0 : promptTokens,
+          completionTokens: isEstimated ? 0 : completionTokens,
+          totalTokens: isEstimated ? 0 : totalTokens,
+          estimatedTokens: isEstimated ? totalTokens : 0,
         );
     await _storage.saveUsage(state);
   }

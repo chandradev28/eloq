@@ -490,7 +490,10 @@ class _UsageCard extends StatelessWidget {
             ? const ApiUsageSummary(
                 providerId: 'none',
                 requests: 0,
-                tokens: 0,
+                promptTokens: 0,
+                completionTokens: 0,
+                totalTokens: 0,
+                estimatedTokens: 0,
                 audioSeconds: 0,
               )
             : usage.summaryForProvider(selectedProviderId);
@@ -603,10 +606,22 @@ class _UsageCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           _UsageLine(
-            label: 'Chat tokens',
-            value: _formatTokens(summary.tokens),
-            progress: _tokenProgress(selectedProviderId, summary.tokens),
+            label: _tokenLabel(summary),
+            value: _formatTokens(summary.displayTokens),
+            progress:
+                _tokenProgress(selectedProviderId, summary.displayTokens),
           ),
+          if (summary.hasExactTokens) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Prompt ${_formatTokens(summary.promptTokens)}  |  Reply ${_formatTokens(summary.completionTokens)}',
+              style: TextStyle(
+                color: AppColors.secondaryText(context),
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
           if ((provider?.hasAudioTracking ?? false) ||
               summary.audioSeconds > 0) ...[
             const SizedBox(height: 12),
@@ -650,6 +665,17 @@ class _UsageCard extends StatelessWidget {
                     height: 1.35,
                   ),
                 ),
+                if (selectedProviderId != 'none') ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    _tokenSourceNote(summary),
+                    style: TextStyle(
+                      color: AppColors.secondaryText(context),
+                      fontSize: 11,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -773,7 +799,24 @@ class _UsageCard extends StatelessWidget {
     return tokens.toString();
   }
 
+  String _tokenLabel(ApiUsageSummary summary) {
+    if (summary.isMixedTokenSource) return 'Mixed chat tokens';
+    if (summary.hasExactTokens) return 'Chat tokens';
+    return 'Est. chat tokens';
+  }
+
+  String _tokenSourceNote(ApiUsageSummary summary) {
+    if (summary.isMixedTokenSource) {
+      return 'Exact provider token usage is shown where available, with estimates only for providers that do not report token counts.';
+    }
+    if (summary.hasExactTokens) {
+      return 'These token counts come directly from provider usage metadata.';
+    }
+    return 'These token counts are estimated from conversation length because this provider did not return usage metadata.';
+  }
+
   String _formatAudio(int audioSeconds) {
+    if (audioSeconds < 60) return '$audioSeconds sec';
     final minutes = (audioSeconds / 60).floor();
     return '$minutes min';
   }

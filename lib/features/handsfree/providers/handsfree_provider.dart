@@ -99,13 +99,13 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
     _seedGreeting();
   }
 
-  static const _voiceStartThresholdDb = -38.0;
-  static const _voiceContinueThresholdDb = -45.0;
-  static const _silenceHold = Duration(milliseconds: 1400);
+  static const _voiceStartThresholdDb = -34.0;
+  static const _voiceContinueThresholdDb = -40.0;
+  static const _silenceHold = Duration(milliseconds: 900);
   static const _amplitudeInterval = Duration(milliseconds: 220);
-  static const _maxUtterance = Duration(seconds: 18);
-  static const _minSpeechLength = Duration(milliseconds: 700);
-  static const _noSpeechFallback = Duration(seconds: 6);
+  static const _maxUtterance = Duration(seconds: 10);
+  static const _minSpeechLength = Duration(milliseconds: 450);
+  static const _noSpeechFallback = Duration(milliseconds: 3500);
 
   final Ref ref;
   final Uuid _uuid = const Uuid();
@@ -320,8 +320,13 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
             topic: topic,
             history: previousMessages,
             userText: text,
-            extraInstructions: state.customPrompt,
+            extraInstructions: [
+              'Keep spoken replies short and natural. Use one or two concise sentences, then ask one follow-up question.',
+              state.customPrompt.trim(),
+            ].where((item) => item.isNotEmpty).join('\n'),
             learnerContext: state.resumeContext,
+            maxOutputTokens: 160,
+            maxHistoryMessages: 4,
           );
       final assistantMessage = Message(
         id: _uuid.v4(),
@@ -339,7 +344,10 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
         await ref.read(usageProvider.notifier).trackChat(
               provider: response.provider,
               model: response.model,
-              estimatedTokens: response.estimatedTokens,
+              promptTokens: response.promptTokens,
+              completionTokens: response.completionTokens,
+              totalTokens: response.totalTokens,
+              isEstimated: response.isTokenUsageEstimated,
             );
       }
       await ref.read(progressProvider.notifier).addMessageXp(
