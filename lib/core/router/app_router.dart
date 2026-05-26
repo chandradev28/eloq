@@ -6,6 +6,7 @@ import '../../features/conversation/screens/conversation_screen.dart';
 import '../../features/handsfree/screens/handsfree_screen.dart';
 import '../../features/history/screens/history_screen.dart';
 import '../../features/home/screens/home_screen.dart';
+import '../../features/live_voice/screens/live_voice_screen.dart';
 import '../../features/onboarding/screens/onboarding_screen.dart';
 import '../../features/progress/screens/progress_screen.dart';
 import '../../features/settings/screens/settings_screen.dart';
@@ -76,8 +77,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/conversation/:topicId',
         builder: (context, state) {
-          final session =
-              state.extra is ConversationSession ? state.extra as ConversationSession : null;
+          final session = state.extra is ConversationSession
+              ? state.extra as ConversationSession
+              : null;
           return ConversationScreen(
             topicId: state.pathParameters['topicId'] ?? 'restaurant',
             session: session,
@@ -87,9 +89,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/handsfree',
         builder: (context, state) {
-          final session =
-              state.extra is ConversationSession ? state.extra as ConversationSession : null;
+          final session = state.extra is ConversationSession
+              ? state.extra as ConversationSession
+              : null;
           return HandsfreeScreen(session: session);
+        },
+      ),
+      GoRoute(
+        path: '/live-voice',
+        builder: (context, state) {
+          final session = state.extra is ConversationSession
+              ? state.extra as ConversationSession
+              : null;
+          return LiveVoiceScreen(session: session);
         },
       ),
     ],

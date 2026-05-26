@@ -72,6 +72,10 @@ void main() {
       280,
       scrollable: find.byType(Scrollable).first,
     );
+    await tester.ensureVisible(find.text('Save settings'));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, -240));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Save settings'));
     await tester.pumpAndSettle();
 

@@ -73,10 +73,14 @@ class LlmRouterService {
     );
     final openAiMessages = [
       {'role': 'system', 'content': systemPrompt},
-      ...history.reversed.take(maxHistoryMessages).toList().reversed.map((message) => {
-            'role': message.isUser ? 'user' : 'assistant',
-            'content': message.text,
-          }),
+      ...history.reversed
+          .take(maxHistoryMessages)
+          .toList()
+          .reversed
+          .map((message) => {
+                'role': message.isUser ? 'user' : 'assistant',
+                'content': message.text,
+              }),
       {'role': 'user', 'content': userText},
     ];
 
@@ -85,7 +89,7 @@ class LlmRouterService {
         id: 'groq',
         apiKey: settings.groqApiKey,
         baseUrl: 'https://api.groq.com/openai/v1',
-        model: 'llama-3.3-70b-versatile',
+        model: settings.groqChatModel,
       ),
       _ProviderConfig(
         id: 'cerebras',
@@ -112,6 +116,12 @@ class LlmRouterService {
         baseUrl: 'https://openrouter.ai/api/v1',
         model: 'openrouter/free',
         headers: {'HTTP-Referer': 'https://eloq.app'},
+      ),
+      _ProviderConfig(
+        id: 'deepseek',
+        apiKey: settings.deepSeekApiKey,
+        baseUrl: 'https://api.deepseek.com',
+        model: settings.deepSeekChatModel,
       ),
     ];
     final orderedProviders = _orderProviders(
@@ -179,7 +189,7 @@ class LlmRouterService {
             id: 'groq',
             apiKey: apiKey,
             baseUrl: 'https://api.groq.com/openai/v1',
-            model: 'llama-3.3-70b-versatile',
+            model: 'meta-llama/llama-4-scout-17b-16e-instruct',
           ),
         'cerebras' => _ProviderConfig(
             id: 'cerebras',
@@ -206,6 +216,12 @@ class LlmRouterService {
             baseUrl: 'https://openrouter.ai/api/v1',
             model: 'openrouter/free',
             headers: {'HTTP-Referer': 'https://eloq.app'},
+          ),
+        'deepseek' => _ProviderConfig(
+            id: 'deepseek',
+            apiKey: apiKey,
+            baseUrl: 'https://api.deepseek.com',
+            model: 'deepseek-v4-flash',
           ),
         _ => null,
       };
@@ -316,8 +332,7 @@ class LlmRouterService {
   LlmResponse _parseResponse(
     String raw,
     String provider,
-    String model,
-    {
+    String model, {
     required int promptTokens,
     required int completionTokens,
     required int totalTokens,

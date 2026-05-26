@@ -25,6 +25,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _sambanova = TextEditingController();
   final _gemini = TextEditingController();
   final _openRouter = TextEditingController();
+  final _deepSeek = TextEditingController();
   final _xai = TextEditingController();
   bool _hydrated = false;
   final Set<String> _validating = {};
@@ -37,6 +38,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _sambanova.dispose();
     _gemini.dispose();
     _openRouter.dispose();
+    _deepSeek.dispose();
     _xai.dispose();
     super.dispose();
   }
@@ -45,8 +47,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
     final usage = ref.watch(usageProvider);
-    final premiumUnlocked = _xai.text.trim().isNotEmpty || settings.hasXaiKey;
-    final selectedVoiceMode = premiumUnlocked ? settings.voiceMode : 'free';
+    final liveVoiceUnlocked =
+        _gemini.text.trim().isNotEmpty || settings.hasGeminiKey;
+    final selectedVoiceMode =
+        liveVoiceUnlocked ? settings.voiceMode : 'standard';
     if (settings.isLoaded && !_hydrated) {
       _hydrate(settings);
     }
@@ -126,9 +130,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   onTest: () => _testKey('openrouter', _openRouter.text),
                 ),
                 _KeyField(
+                  controller: _deepSeek,
+                  label: 'DeepSeek API key',
+                  status: _validation['deepseek'],
+                  validating: _validating.contains('deepseek'),
+                  onTest: () => _testKey('deepseek', _deepSeek.text),
+                ),
+                _KeyField(
                   controller: _xai,
                   label: 'xAI API key',
-                  helper: 'Unlocks the Premium voice mode option.',
+                  helper:
+                      'Optional future premium voice key. Live Voice uses Gemini.',
                   onChanged: (value) {
                     setState(() {});
                   },
@@ -156,24 +168,87 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 const SizedBox(height: 16),
                 _PracticeModeCard(
-                  title: 'Voice mode',
-                  subtitle: premiumUnlocked
-                      ? 'Premium is unlocked because an xAI key is present. Free mode is still the only fully implemented runtime path today.'
-                      : 'Free mode uses Groq Whisper, the router, and device TTS. Add an xAI key to unlock the Premium option.',
+                  title: 'Groq response mode',
+                  subtitle: settings.groqChatModeSummary,
                   children: [
                     _ChoiceRow(
                       options: const [
-                        ('free', 'Free'),
-                        ('premium', 'Premium'),
+                        ('fast', 'Fast'),
+                        ('smart', 'Smart'),
+                      ],
+                      selected: settings.groqChatMode,
+                      onChanged: (value) {
+                        ref.read(settingsProvider.notifier).update(
+                              (current) =>
+                                  current.copyWith(groqChatMode: value),
+                            );
+                      },
+                    ),
+                    Text(
+                      settings.isGroqSmartMode
+                          ? 'Uses Llama 4 Maverick on Groq.'
+                          : 'Uses Llama 4 Scout on Groq.',
+                      style: TextStyle(
+                        color: AppColors.secondaryText(context),
+                        fontSize: 12,
+                        height: 1.35,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _PracticeModeCard(
+                  title: 'DeepSeek response mode',
+                  subtitle: settings.deepSeekChatModeSummary,
+                  children: [
+                    _ChoiceRow(
+                      options: const [
+                        ('flash', 'Flash'),
+                        ('pro', 'Pro'),
+                      ],
+                      selected: settings.deepSeekChatMode,
+                      onChanged: (value) {
+                        ref.read(settingsProvider.notifier).update(
+                              (current) =>
+                                  current.copyWith(deepSeekChatMode: value),
+                            );
+                      },
+                    ),
+                    Text(
+                      settings.isDeepSeekProMode
+                          ? 'Uses DeepSeek V4 Pro.'
+                          : 'Uses DeepSeek V4 Flash.',
+                      style: TextStyle(
+                        color: AppColors.secondaryText(context),
+                        fontSize: 12,
+                        height: 1.35,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _PracticeModeCard(
+                  title: 'Voice engine',
+                  subtitle: liveVoiceUnlocked
+                      ? 'Live Voice is ready because a Gemini key is present. Standard voice remains the fallback path.'
+                      : 'Standard voice uses transcription, the router, and device TTS. Add a Gemini key to unlock Live Voice.',
+                  children: [
+                    _ChoiceRow(
+                      options: const [
+                        ('standard', 'Standard'),
+                        ('live', 'Live Voice'),
                       ],
                       selected: selectedVoiceMode,
                       onChanged: (value) {
-                        if (value == 'premium' && !premiumUnlocked) return;
+                        if (value == 'live' && !liveVoiceUnlocked) return;
                         ref.read(settingsProvider.notifier).update(
                               (current) => current.copyWith(voiceMode: value),
                             );
                       },
-                      isEnabled: (value) => value == 'free' || premiumUnlocked,
+                      isEnabled: (value) =>
+                          value == 'standard' || liveVoiceUnlocked,
                     ),
                   ],
                 ),
@@ -237,6 +312,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _sambanova.text = settings.sambanovaApiKey;
     _gemini.text = settings.geminiApiKey;
     _openRouter.text = settings.openRouterApiKey;
+    _deepSeek.text = settings.deepSeekApiKey;
     _xai.text = settings.xaiApiKey;
     _hydrated = true;
   }
@@ -250,8 +326,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             sambanovaApiKey: _sambanova.text,
             geminiApiKey: _gemini.text,
             openRouterApiKey: _openRouter.text,
+            deepSeekApiKey: _deepSeek.text,
             xaiApiKey: _xai.text,
-            voiceMode: _xai.text.trim().isEmpty ? 'free' : current.voiceMode,
+            voiceMode:
+                _gemini.text.trim().isEmpty ? 'standard' : current.voiceMode,
           ),
         );
     if (!mounted) return;
@@ -295,6 +373,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       'settings': {
         'difficulty': settings.difficulty,
         'voiceMode': settings.voiceMode,
+        'groqChatMode': settings.groqChatMode,
+        'deepSeekChatMode': settings.deepSeekChatMode,
         'preferredProvider': settings.preferredProvider,
         'speakingSpeed': settings.speakingSpeed,
         'dailyGoalMinutes': settings.dailyGoalMinutes,
@@ -482,8 +562,8 @@ class _UsageCard extends StatelessWidget {
     final provider = selectedProviderId == 'auto'
         ? null
         : selectedProviderId == 'none'
-        ? null
-        : ApiProviders.byId(selectedProviderId);
+            ? null
+            : ApiProviders.byId(selectedProviderId);
     final summary = selectedProviderId == 'auto'
         ? usage.totalSummary
         : selectedProviderId == 'none'
@@ -608,8 +688,7 @@ class _UsageCard extends StatelessWidget {
           _UsageLine(
             label: _tokenLabel(summary),
             value: _formatTokens(summary.displayTokens),
-            progress:
-                _tokenProgress(selectedProviderId, summary.displayTokens),
+            progress: _tokenProgress(selectedProviderId, summary.displayTokens),
           ),
           if (summary.hasExactTokens) ...[
             const SizedBox(height: 8),
@@ -722,6 +801,7 @@ class _UsageCard extends StatelessWidget {
       'cerebras',
       'sambanova',
       'openrouter',
+      'deepseek',
     ]) {
       if (_hasKeyForProvider(providerId)) {
         return providerId;
@@ -737,6 +817,7 @@ class _UsageCard extends StatelessWidget {
       'cerebras' => settings.cerebrasApiKey.trim().isNotEmpty,
       'sambanova' => settings.sambanovaApiKey.trim().isNotEmpty,
       'openrouter' => settings.openRouterApiKey.trim().isNotEmpty,
+      'deepseek' => settings.deepSeekApiKey.trim().isNotEmpty,
       _ => false,
     };
   }
@@ -824,6 +905,7 @@ class _UsageCard extends StatelessWidget {
   double _requestProgress(String providerId, int requests) {
     return switch (providerId) {
       'gemini' => requests / 60,
+      'deepseek' => requests / 60,
       'auto' => requests / 40,
       _ => requests / 30,
     };
@@ -833,6 +915,7 @@ class _UsageCard extends StatelessWidget {
     return switch (providerId) {
       'groq' => tokens / 100000,
       'gemini' => tokens / 50000,
+      'deepseek' => tokens / 100000,
       _ => tokens / 50000,
     };
   }

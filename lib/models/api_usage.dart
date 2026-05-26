@@ -184,8 +184,10 @@ class ApiUsage {
     );
   }
 
-  int get groqChatRequests => entry('groq:llama-3.3-70b-versatile').requests;
-  int get groqChatTokens => entry('groq:llama-3.3-70b-versatile').displayTokens;
+  int get groqChatRequests =>
+      summaryForProvider('groq').requests -
+      entry('groq:whisper-large-v3-turbo').requests;
+  int get groqChatTokens => summaryForProvider('groq').displayTokens;
   int get groqAudioSeconds => entry('groq:whisper-large-v3-turbo').audioSeconds;
   int get groqWhisperRequests => entry('groq:whisper-large-v3-turbo').requests;
 

@@ -31,16 +31,18 @@ class StorageService {
           : const AppSettings(isLoaded: true);
 
       final xaiApiKey = await _secureStorage.read(key: 'xaiApiKey') ?? '';
+      final geminiApiKey = await _secureStorage.read(key: 'geminiApiKey') ?? '';
       return base.copyWith(
         groqApiKey: await _secureStorage.read(key: 'groqApiKey') ?? '',
         cerebrasApiKey: await _secureStorage.read(key: 'cerebrasApiKey') ?? '',
         sambanovaApiKey:
             await _secureStorage.read(key: 'sambanovaApiKey') ?? '',
-        geminiApiKey: await _secureStorage.read(key: 'geminiApiKey') ?? '',
+        geminiApiKey: geminiApiKey,
         openRouterApiKey:
             await _secureStorage.read(key: 'openRouterApiKey') ?? '',
+        deepSeekApiKey: await _secureStorage.read(key: 'deepSeekApiKey') ?? '',
         xaiApiKey: xaiApiKey,
-        voiceMode: xaiApiKey.trim().isEmpty ? 'free' : base.voiceMode,
+        voiceMode: geminiApiKey.trim().isEmpty ? 'standard' : base.voiceMode,
         isLoaded: true,
       );
     } catch (_) {
@@ -56,6 +58,7 @@ class StorageService {
     await _writeSecret('sambanovaApiKey', settings.sambanovaApiKey);
     await _writeSecret('geminiApiKey', settings.geminiApiKey);
     await _writeSecret('openRouterApiKey', settings.openRouterApiKey);
+    await _writeSecret('deepSeekApiKey', settings.deepSeekApiKey);
     await _writeSecret('xaiApiKey', settings.xaiApiKey);
   }
 

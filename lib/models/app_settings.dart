@@ -5,9 +5,12 @@ class AppSettings {
     this.sambanovaApiKey = '',
     this.geminiApiKey = '',
     this.openRouterApiKey = '',
+    this.deepSeekApiKey = '',
     this.xaiApiKey = '',
     this.difficulty = 'beginner',
-    this.voiceMode = 'free',
+    this.voiceMode = 'standard',
+    this.groqChatMode = 'fast',
+    this.deepSeekChatMode = 'flash',
     this.preferredProvider = 'auto',
     this.voiceName = '',
     this.speakingSpeed = 1.0,
@@ -23,9 +26,12 @@ class AppSettings {
   final String sambanovaApiKey;
   final String geminiApiKey;
   final String openRouterApiKey;
+  final String deepSeekApiKey;
   final String xaiApiKey;
   final String difficulty;
   final String voiceMode;
+  final String groqChatMode;
+  final String deepSeekChatMode;
   final String preferredProvider;
   final String voiceName;
   final double speakingSpeed;
@@ -36,12 +42,15 @@ class AppSettings {
   final bool isLoaded;
 
   bool get hasGroqKey => groqApiKey.trim().isNotEmpty;
+  bool get hasGeminiKey => geminiApiKey.trim().isNotEmpty;
+  bool get hasDeepSeekKey => deepSeekApiKey.trim().isNotEmpty;
   bool get hasXaiKey => xaiApiKey.trim().isNotEmpty;
   bool get hasAnyLlmKey =>
       hasGroqKey ||
       cerebrasApiKey.trim().isNotEmpty ||
       sambanovaApiKey.trim().isNotEmpty ||
       geminiApiKey.trim().isNotEmpty ||
+      hasDeepSeekKey ||
       openRouterApiKey.trim().isNotEmpty;
 
   String get difficultyLabel => switch (difficulty) {
@@ -50,9 +59,41 @@ class AppSettings {
         _ => 'Beginner',
       };
 
-  bool get isPremiumMode => voiceMode == 'premium';
-  bool get premiumUnlocked => hasXaiKey;
+  bool get isLiveVoiceMode => voiceMode == 'live';
+  bool get liveVoiceUnlocked => hasGeminiKey;
   bool get isAutoProvider => preferredProvider == 'auto';
+  bool get isGroqSmartMode => groqChatMode == 'smart';
+
+  String get groqChatModel => switch (groqChatMode) {
+        'smart' => 'meta-llama/llama-4-maverick-17b-128e-instruct',
+        _ => 'meta-llama/llama-4-scout-17b-16e-instruct',
+      };
+
+  String get groqChatModeLabel => switch (groqChatMode) {
+        'smart' => 'Smart',
+        _ => 'Fast',
+      };
+
+  String get groqChatModeSummary => switch (groqChatMode) {
+        'smart' =>
+          'Maverick gives richer answers and stronger reasoning for deeper practice.',
+        _ =>
+          'Scout keeps normal practice quick and responsive with shorter waits.',
+      };
+
+  bool get isDeepSeekProMode => deepSeekChatMode == 'pro';
+
+  String get deepSeekChatModel => switch (deepSeekChatMode) {
+        'pro' => 'deepseek-v4-pro',
+        _ => 'deepseek-v4-flash',
+      };
+
+  String get deepSeekChatModeSummary => switch (deepSeekChatMode) {
+        'pro' =>
+          'Pro is for deeper answers, stronger reasoning, and richer corrections.',
+        _ =>
+          'Flash is the faster, lower-cost DeepSeek option for daily practice.',
+      };
 
   String get difficultySummary => switch (difficulty) {
         'advanced' =>
@@ -68,9 +109,12 @@ class AppSettings {
     String? sambanovaApiKey,
     String? geminiApiKey,
     String? openRouterApiKey,
+    String? deepSeekApiKey,
     String? xaiApiKey,
     String? difficulty,
     String? voiceMode,
+    String? groqChatMode,
+    String? deepSeekChatMode,
     String? preferredProvider,
     String? voiceName,
     double? speakingSpeed,
@@ -86,9 +130,12 @@ class AppSettings {
       sambanovaApiKey: sambanovaApiKey ?? this.sambanovaApiKey,
       geminiApiKey: geminiApiKey ?? this.geminiApiKey,
       openRouterApiKey: openRouterApiKey ?? this.openRouterApiKey,
+      deepSeekApiKey: deepSeekApiKey ?? this.deepSeekApiKey,
       xaiApiKey: xaiApiKey ?? this.xaiApiKey,
       difficulty: difficulty ?? this.difficulty,
       voiceMode: voiceMode ?? this.voiceMode,
+      groqChatMode: groqChatMode ?? this.groqChatMode,
+      deepSeekChatMode: deepSeekChatMode ?? this.deepSeekChatMode,
       preferredProvider: preferredProvider ?? this.preferredProvider,
       voiceName: voiceName ?? this.voiceName,
       speakingSpeed: speakingSpeed ?? this.speakingSpeed,
@@ -104,6 +151,8 @@ class AppSettings {
   Map<String, dynamic> toJson() => {
         'difficulty': difficulty,
         'voiceMode': voiceMode,
+        'groqChatMode': groqChatMode,
+        'deepSeekChatMode': deepSeekChatMode,
         'preferredProvider': preferredProvider,
         'voiceName': voiceName,
         'speakingSpeed': speakingSpeed,
@@ -116,7 +165,21 @@ class AppSettings {
   factory AppSettings.fromJson(Map<dynamic, dynamic> json) {
     return AppSettings(
       difficulty: json['difficulty']?.toString() ?? 'beginner',
-      voiceMode: json['voiceMode']?.toString() ?? 'free',
+      voiceMode: switch (json['voiceMode']?.toString()) {
+        'premium' => 'live',
+        'free' => 'standard',
+        'live' => 'live',
+        _ => 'standard',
+      },
+      groqChatMode: switch (json['groqChatMode']?.toString()) {
+        'smart' => 'smart',
+        'maverick' => 'smart',
+        _ => 'fast',
+      },
+      deepSeekChatMode: switch (json['deepSeekChatMode']?.toString()) {
+        'pro' => 'pro',
+        _ => 'flash',
+      },
       preferredProvider: json['preferredProvider']?.toString() ?? 'auto',
       voiceName: json['voiceName']?.toString() ?? '',
       speakingSpeed: (json['speakingSpeed'] as num?)?.toDouble() ?? 1.0,

@@ -101,7 +101,8 @@ class HomeScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 16),
                   _HandsfreePracticeCard(
-                    onTap: () => context.push('/handsfree'),
+                    onTap: () => context.push('/live-voice'),
+                    onFallbackTap: () => context.push('/handsfree'),
                   ),
                   const SizedBox(height: 16),
                   _StripedPracticeCard(
@@ -166,8 +167,13 @@ class HomeScreen extends ConsumerWidget {
 }
 
 void _resumeSession(BuildContext context, ConversationSession session) {
-  if (session.provider.toLowerCase() == 'handsfree') {
+  final provider = session.provider.toLowerCase();
+  if (provider == 'handsfree') {
     context.push('/handsfree', extra: session);
+    return;
+  }
+  if (provider == 'live_voice') {
+    context.push('/live-voice', extra: session);
     return;
   }
   context.push('/conversation/${session.topicId}', extra: session);
@@ -574,9 +580,13 @@ class _StripedPracticeCard extends StatelessWidget {
 }
 
 class _HandsfreePracticeCard extends StatelessWidget {
-  const _HandsfreePracticeCard({required this.onTap});
+  const _HandsfreePracticeCard({
+    required this.onTap,
+    required this.onFallbackTap,
+  });
 
   final VoidCallback onTap;
+  final VoidCallback onFallbackTap;
 
   @override
   Widget build(BuildContext context) {
@@ -586,7 +596,7 @@ class _HandsfreePracticeCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(30),
         onTap: onTap,
         child: Container(
-          height: 204,
+          height: 280,
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(30),
@@ -612,11 +622,11 @@ class _HandsfreePracticeCard extends StatelessWidget {
                     children: [
                       const Align(
                         alignment: Alignment.centerLeft,
-                        child: _SoftChip(text: 'Handsfree'),
+                        child: _SoftChip(text: 'Live Voice'),
                       ),
-                      const Spacer(),
+                      const SizedBox(height: 18),
                       Text(
-                        'Practice via\nspeaking',
+                        'Talk with\nLive Voice',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.w900,
@@ -625,14 +635,36 @@ class _HandsfreePracticeCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'Voice-first practice with timer, transcript, and custom coach prompt.',
-                        maxLines: 3,
+                        'One open Gemini-powered voice session with transcript, timer, and coach prompt.',
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: Colors.white.withOpacity(0.68),
                           fontSize: 12,
                           height: 1.35,
                           fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 0,
+                              vertical: 4,
+                            ),
+                          ),
+                          onPressed: onFallbackTap,
+                          icon: const Icon(
+                            Icons.history_toggle_off_rounded,
+                            size: 18,
+                          ),
+                          label: const Text('Use fallback'),
                         ),
                       ),
                     ],

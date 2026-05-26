@@ -17,14 +17,14 @@ class OnboardingScreen extends ConsumerStatefulWidget {
 
 class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final _groqController = TextEditingController();
-  final _xaiController = TextEditingController();
+  final _geminiController = TextEditingController();
   String _level = 'beginner';
   bool _hydrated = false;
 
   @override
   void dispose() {
     _groqController.dispose();
-    _xaiController.dispose();
+    _geminiController.dispose();
     super.dispose();
   }
 
@@ -33,7 +33,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final settings = ref.watch(settingsProvider);
     if (settings.isLoaded && !_hydrated) {
       _groqController.text = settings.groqApiKey;
-      _xaiController.text = settings.xaiApiKey;
+      _geminiController.text = settings.geminiApiKey;
       _level = settings.difficulty;
       _hydrated = true;
     }
@@ -68,12 +68,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 _Entrance(
                   index: 2,
                   child: _ApiFieldCard(
-                    controller: _xaiController,
+                    controller: _geminiController,
                     icon: Icons.graphic_eq_rounded,
-                    label: 'xAI API key',
+                    label: 'Gemini API key',
                     helper:
-                        'Optional key that unlocks Premium mode in Settings.',
-                    provider: ApiProviders.xai,
+                        'Optional key that unlocks the new Live Voice mode.',
+                    provider: ApiProviders.gemini,
                     onChanged: () => setState(() {}),
                   ),
                 ),
@@ -114,10 +114,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     await ref.read(settingsProvider.notifier).save(
           current.copyWith(
             groqApiKey: _groqController.text,
-            xaiApiKey: _xaiController.text,
+            geminiApiKey: _geminiController.text,
             difficulty: _level,
-            voiceMode:
-                _xaiController.text.trim().isEmpty ? 'free' : current.voiceMode,
+            voiceMode: _geminiController.text.trim().isEmpty
+                ? 'standard'
+                : current.voiceMode,
             hasCompletedOnboarding: true,
           ),
         );
@@ -129,7 +130,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     await ref.read(settingsProvider.notifier).save(
           current.copyWith(
             difficulty: _level,
-            voiceMode: 'free',
+            voiceMode: 'standard',
             hasCompletedOnboarding: true,
           ),
         );

@@ -96,6 +96,19 @@ class ApiProviders {
     billingLabel: 'Credits / wallet',
   );
 
+  static const deepSeek = ApiProviderInfo(
+    id: 'deepseek',
+    name: 'DeepSeek',
+    url: 'https://platform.deepseek.com/api_keys',
+    kind: 'Free / paid',
+    description: 'Optional text provider with V4 Flash and V4 Pro modes.',
+    icon: Icons.psychology_alt_rounded,
+    usageTitle: 'DeepSeek usage',
+    usageSummary:
+        'Tracks local request count and provider-reported chat token usage.',
+    billingLabel: 'API quota',
+  );
+
   static const xai = ApiProviderInfo(
     id: 'xai',
     name: 'xAI',
@@ -110,9 +123,24 @@ class ApiProviders {
     billingLabel: 'Premium key',
   );
 
-  static const free = [groq, cerebras, sambanova, gemini, openRouter];
+  static const free = [
+    groq,
+    cerebras,
+    sambanova,
+    gemini,
+    openRouter,
+    deepSeek,
+  ];
   static const premium = [xai];
-  static const all = [groq, cerebras, sambanova, gemini, openRouter, xai];
+  static const all = [
+    groq,
+    cerebras,
+    sambanova,
+    gemini,
+    openRouter,
+    deepSeek,
+    xai,
+  ];
 
   static ApiProviderInfo byId(String id) {
     return all.firstWhere(

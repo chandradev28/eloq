@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
@@ -28,6 +30,17 @@ class AudioRecorderService {
   Future<String?> stop() => _recorder.stop();
 
   Future<void> cancel() => _recorder.cancel();
+
+  Future<Stream<Uint8List>> startPcmStream() {
+    return _recorder.startStream(
+      const RecordConfig(
+        encoder: AudioEncoder.pcm16bits,
+        sampleRate: 16000,
+        numChannels: 1,
+        bitRate: 256000,
+      ),
+    );
+  }
 
   Future<bool> isRecording() => _recorder.isRecording();
 

@@ -90,6 +90,10 @@ class HistoryScreen extends ConsumerWidget {
   }
 
   void _resumeSession(BuildContext context, ConversationSession session) {
+    if (session.provider.toLowerCase() == 'live_voice') {
+      context.push('/live-voice', extra: session);
+      return;
+    }
     context.push('/conversation/${session.topicId}', extra: session);
   }
 
