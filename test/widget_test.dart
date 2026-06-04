@@ -51,6 +51,9 @@ void main() {
 
     expect(find.text('Settings'), findsOneWidget);
 
+    await tester.tap(find.text('API connections'));
+    await tester.pumpAndSettle();
+
     for (var i = 0;
         i < 4 && find.text('Groq API key (required)').evaluate().isEmpty;
         i++) {

@@ -143,6 +143,7 @@ class ConversationController extends StateNotifier<ConversationState> {
           ? await ref
               .read(whisperServiceProvider)
               .transcribe(apiKey: settings.groqApiKey, filePath: path)
+              .timeout(const Duration(seconds: 25))
           : 'I want to practice speaking English.';
       if (settings.hasGroqKey) {
         final seconds = DateTime.now()

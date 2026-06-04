@@ -8,6 +8,7 @@ import '../../../core/constants/topics.dart';
 import '../../../features/conversation/models/message.dart';
 import '../../../features/settings/providers/settings_provider.dart';
 import '../../../models/conversation_session.dart';
+import '../../../models/app_settings.dart';
 import '../../../services/audio_recorder_service.dart';
 import '../../../services/llm_router_service.dart';
 import '../../../services/tts_service.dart';
@@ -321,12 +322,15 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
             history: previousMessages,
             userText: text,
             extraInstructions: [
-              'Keep spoken replies short and natural. Use one or two concise sentences, then ask one follow-up question.',
+              'Handsfree voice mode needs speed. Reply with one short natural sentence, then ask one short follow-up question.',
               state.customPrompt.trim(),
             ].where((item) => item.isNotEmpty).join('\n'),
             learnerContext: state.resumeContext,
-            maxOutputTokens: 160,
-            maxHistoryMessages: 4,
+            maxOutputTokens: 110,
+            maxHistoryMessages: 2,
+            allowedProviderIds: _handsfreeProviderIds(settings),
+            preferLowLatency: true,
+            requestTimeout: const Duration(seconds: 10),
           );
       final assistantMessage = Message(
         id: _uuid.v4(),
@@ -509,6 +513,7 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
           ? await ref
               .read(whisperServiceProvider)
               .transcribe(apiKey: settings.groqApiKey, filePath: path)
+              .timeout(const Duration(seconds: 25))
           : 'I want to keep practicing speaking English.';
       state = state.copyWith(isTranscribing: false);
 
@@ -689,6 +694,16 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
   }
 
   int _secondsForMinutes(int minutes) => minutes <= 0 ? 0 : minutes * 60;
+
+  List<String>? _handsfreeProviderIds(AppSettings settings) {
+    if (settings.preferredProvider != 'auto') {
+      return [settings.preferredProvider];
+    }
+    if (settings.hasGroqKey) return const ['groq'];
+    if (settings.hasGeminiKey) return const ['gemini'];
+    if (settings.hasDeepSeekKey) return const ['deepseek'];
+    return null;
+  }
 
   @override
   void dispose() {

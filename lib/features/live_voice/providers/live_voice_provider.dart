@@ -170,7 +170,7 @@ class LiveVoiceController extends StateNotifier<LiveVoiceState> {
     if (settings.geminiApiKey.trim().isEmpty) {
       state = state.copyWith(
         error:
-            'Add a Gemini API key in Settings to use Live Voice. Standard handsfree is still available as a fallback.',
+            'Add a Live Voice API key in Settings to use the AI speaking coach. Standard voice is still available.',
       );
       return;
     }

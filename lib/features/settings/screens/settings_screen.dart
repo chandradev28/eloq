@@ -69,8 +69,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         fontWeight: FontWeight.w900,
                       ),
                 ),
-                const SizedBox(height: 18),
-                const _SectionTitle('Appearance'),
+                const SizedBox(height: 14),
                 _AppearanceCard(
                   isDarkMode: settings.isDarkMode,
                   onChanged: (value) {
@@ -79,214 +78,213 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         );
                   },
                 ),
-                const SizedBox(height: 20),
-                const _SectionTitle('Usage today'),
+                const SizedBox(height: 12),
                 _UsageCard(
                   usage: usage,
                   settings: settings,
                 ),
-                const SizedBox(height: 20),
-                const _SectionTitle('API keys'),
-                if (!settings.isLoaded) ...[
-                  const LinearProgressIndicator(minHeight: 3),
-                  const SizedBox(height: 12),
-                ],
-                const ApiKeyGuide(),
-                const SizedBox(height: 16),
-                _KeyField(
-                  controller: _groq,
-                  label: 'Groq API key',
-                  required: true,
-                  status: _validation['groq'],
-                  validating: _validating.contains('groq'),
-                  onTest: () => _testKey('groq', _groq.text),
-                ),
-                _KeyField(
-                  controller: _cerebras,
-                  label: 'Cerebras API key',
-                  status: _validation['cerebras'],
-                  validating: _validating.contains('cerebras'),
-                  onTest: () => _testKey('cerebras', _cerebras.text),
-                ),
-                _KeyField(
-                  controller: _sambanova,
-                  label: 'SambaNova API key',
-                  status: _validation['sambanova'],
-                  validating: _validating.contains('sambanova'),
-                  onTest: () => _testKey('sambanova', _sambanova.text),
-                ),
-                _KeyField(
-                  controller: _gemini,
-                  label: 'Gemini API key',
-                  status: _validation['gemini'],
-                  validating: _validating.contains('gemini'),
-                  onTest: () => _testKey('gemini', _gemini.text),
-                ),
-                _KeyField(
-                  controller: _openRouter,
-                  label: 'OpenRouter API key',
-                  status: _validation['openrouter'],
-                  validating: _validating.contains('openrouter'),
-                  onTest: () => _testKey('openrouter', _openRouter.text),
-                ),
-                _KeyField(
-                  controller: _deepSeek,
-                  label: 'DeepSeek API key',
-                  status: _validation['deepseek'],
-                  validating: _validating.contains('deepseek'),
-                  onTest: () => _testKey('deepseek', _deepSeek.text),
-                ),
-                _KeyField(
-                  controller: _xai,
-                  label: 'xAI API key',
-                  helper:
-                      'Optional future premium voice key. Live Voice uses Gemini.',
-                  onChanged: (value) {
-                    setState(() {});
-                  },
-                ),
-                const SizedBox(height: 20),
-                const _SectionTitle('Practice'),
-                _PracticeModeCard(
-                  title: 'English level',
-                  subtitle: settings.difficultySummary,
+                const SizedBox(height: 12),
+                _SettingsSectionCard(
+                  icon: Icons.key_rounded,
+                  title: 'API connections',
+                  subtitle: _apiSummary(settings),
+                  trailingText: '${_connectedApiCount(settings)} saved',
                   children: [
-                    _ChoiceRow(
-                      options: const [
-                        ('beginner', 'Beginner'),
-                        ('intermediate', 'Intermediate'),
-                        ('advanced', 'Advanced'),
-                      ],
-                      selected: settings.difficulty,
+                    if (!settings.isLoaded) ...[
+                      const LinearProgressIndicator(minHeight: 3),
+                      const SizedBox(height: 14),
+                    ],
+                    const ApiKeyGuide(),
+                    const SizedBox(height: 14),
+                    _KeyField(
+                      controller: _groq,
+                      label: 'Groq API key',
+                      required: true,
+                      status: _validation['groq'],
+                      validating: _validating.contains('groq'),
+                      onTest: () => _testKey('groq', _groq.text),
+                    ),
+                    _KeyField(
+                      controller: _cerebras,
+                      label: 'Cerebras API key',
+                      status: _validation['cerebras'],
+                      validating: _validating.contains('cerebras'),
+                      onTest: () => _testKey('cerebras', _cerebras.text),
+                    ),
+                    _KeyField(
+                      controller: _sambanova,
+                      label: 'SambaNova API key',
+                      status: _validation['sambanova'],
+                      validating: _validating.contains('sambanova'),
+                      onTest: () => _testKey('sambanova', _sambanova.text),
+                    ),
+                    _KeyField(
+                      controller: _gemini,
+                      label: 'Gemini API key',
+                      status: _validation['gemini'],
+                      validating: _validating.contains('gemini'),
+                      onTest: () => _testKey('gemini', _gemini.text),
+                    ),
+                    _KeyField(
+                      controller: _openRouter,
+                      label: 'OpenRouter API key',
+                      status: _validation['openrouter'],
+                      validating: _validating.contains('openrouter'),
+                      onTest: () => _testKey('openrouter', _openRouter.text),
+                    ),
+                    _KeyField(
+                      controller: _deepSeek,
+                      label: 'DeepSeek API key',
+                      status: _validation['deepseek'],
+                      validating: _validating.contains('deepseek'),
+                      onTest: () => _testKey('deepseek', _deepSeek.text),
+                    ),
+                    _KeyField(
+                      controller: _xai,
+                      label: 'xAI API key',
+                      helper:
+                          'Optional future premium voice key for richer AI voice options.',
                       onChanged: (value) {
-                        ref.read(settingsProvider.notifier).update(
-                              (current) => current.copyWith(difficulty: value),
-                            );
+                        setState(() {});
                       },
                     ),
                   ],
-                ),
-                const SizedBox(height: 16),
-                _PracticeModeCard(
-                  title: 'Groq response mode',
-                  subtitle: settings.groqChatModeSummary,
-                  children: [
-                    _ChoiceRow(
-                      options: const [
-                        ('fast', 'Fast'),
-                        ('smart', 'Smart'),
-                      ],
-                      selected: settings.groqChatMode,
-                      onChanged: (value) {
-                        ref.read(settingsProvider.notifier).update(
-                              (current) =>
-                                  current.copyWith(groqChatMode: value),
-                            );
-                      },
-                    ),
-                    Text(
-                      settings.isGroqSmartMode
-                          ? 'Uses Llama 4 Maverick on Groq.'
-                          : 'Uses Llama 4 Scout on Groq.',
-                      style: TextStyle(
-                        color: AppColors.secondaryText(context),
-                        fontSize: 12,
-                        height: 1.35,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                _PracticeModeCard(
-                  title: 'DeepSeek response mode',
-                  subtitle: settings.deepSeekChatModeSummary,
-                  children: [
-                    _ChoiceRow(
-                      options: const [
-                        ('flash', 'Flash'),
-                        ('pro', 'Pro'),
-                      ],
-                      selected: settings.deepSeekChatMode,
-                      onChanged: (value) {
-                        ref.read(settingsProvider.notifier).update(
-                              (current) =>
-                                  current.copyWith(deepSeekChatMode: value),
-                            );
-                      },
-                    ),
-                    Text(
-                      settings.isDeepSeekProMode
-                          ? 'Uses DeepSeek V4 Pro.'
-                          : 'Uses DeepSeek V4 Flash.',
-                      style: TextStyle(
-                        color: AppColors.secondaryText(context),
-                        fontSize: 12,
-                        height: 1.35,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                _PracticeModeCard(
-                  title: 'Voice engine',
-                  subtitle: liveVoiceUnlocked
-                      ? 'Live Voice is ready because a Gemini key is present. Standard voice remains the fallback path.'
-                      : 'Standard voice uses transcription, the router, and device TTS. Add a Gemini key to unlock Live Voice.',
-                  children: [
-                    _ChoiceRow(
-                      options: const [
-                        ('standard', 'Standard'),
-                        ('live', 'Live Voice'),
-                      ],
-                      selected: selectedVoiceMode,
-                      onChanged: (value) {
-                        if (value == 'live' && !liveVoiceUnlocked) return;
-                        ref.read(settingsProvider.notifier).update(
-                              (current) => current.copyWith(voiceMode: value),
-                            );
-                      },
-                      isEnabled: (value) =>
-                          value == 'standard' || liveVoiceUnlocked,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Speaking speed ${settings.speakingSpeed.toStringAsFixed(1)}x',
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                ),
-                Slider(
-                  min: 0.5,
-                  max: 2.0,
-                  divisions: 15,
-                  value: settings.speakingSpeed,
-                  onChanged: (value) {
-                    ref.read(settingsProvider.notifier).update(
-                          (current) => current.copyWith(speakingSpeed: value),
-                        );
-                  },
                 ),
                 const SizedBox(height: 12),
-                Text(
-                  'Daily goal ${settings.dailyGoalMinutes} min',
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+                _SettingsSectionCard(
+                  icon: Icons.tune_rounded,
+                  title: 'Practice setup',
+                  subtitle:
+                      '${settings.difficultyLabel} level, ${settings.groqChatModeLabel.toLowerCase()} Groq, ${settings.dailyGoalMinutes} min goal',
+                  children: [
+                    _PracticeModeCard(
+                      title: 'English level',
+                      subtitle: settings.difficultySummary,
+                      children: [
+                        _ChoiceRow(
+                          options: const [
+                            ('beginner', 'Beginner'),
+                            ('intermediate', 'Intermediate'),
+                            ('advanced', 'Advanced'),
+                          ],
+                          selected: settings.difficulty,
+                          onChanged: (value) {
+                            ref.read(settingsProvider.notifier).update(
+                                  (current) =>
+                                      current.copyWith(difficulty: value),
+                                );
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _PracticeModeCard(
+                      title: 'Groq response mode',
+                      subtitle: settings.groqChatModeSummary,
+                      children: [
+                        _ChoiceRow(
+                          options: const [
+                            ('fast', 'Fast'),
+                            ('smart', 'Smart'),
+                          ],
+                          selected: settings.groqChatMode,
+                          onChanged: (value) {
+                            ref.read(settingsProvider.notifier).update(
+                                  (current) =>
+                                      current.copyWith(groqChatMode: value),
+                                );
+                          },
+                        ),
+                        _MiniNote(
+                          text: settings.isGroqSmartMode
+                              ? 'Uses Llama 4 Maverick, then Scout if needed.'
+                              : 'Uses Llama 4 Scout for faster daily practice.',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _PracticeModeCard(
+                      title: 'DeepSeek response mode',
+                      subtitle: settings.deepSeekChatModeSummary,
+                      children: [
+                        _ChoiceRow(
+                          options: const [
+                            ('flash', 'Flash'),
+                            ('pro', 'Pro'),
+                          ],
+                          selected: settings.deepSeekChatMode,
+                          onChanged: (value) {
+                            ref.read(settingsProvider.notifier).update(
+                                  (current) =>
+                                      current.copyWith(deepSeekChatMode: value),
+                                );
+                          },
+                        ),
+                        _MiniNote(
+                          text: settings.isDeepSeekProMode
+                              ? 'Uses DeepSeek V4 Pro.'
+                              : 'Uses DeepSeek V4 Flash.',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _PracticeModeCard(
+                      title: 'Voice engine',
+                      subtitle: liveVoiceUnlocked
+                          ? 'Live Voice is ready for a smoother AI speaking flow. Standard voice stays available.'
+                          : 'Standard voice uses transcription, the router, and device TTS. Add a Live Voice key for the smoother AI speaking flow.',
+                      children: [
+                        _ChoiceRow(
+                          options: const [
+                            ('standard', 'Standard'),
+                            ('live', 'Live Voice'),
+                          ],
+                          selected: selectedVoiceMode,
+                          onChanged: (value) {
+                            if (value == 'live' && !liveVoiceUnlocked) return;
+                            ref.read(settingsProvider.notifier).update(
+                                  (current) =>
+                                      current.copyWith(voiceMode: value),
+                                );
+                          },
+                          isEnabled: (value) =>
+                              value == 'standard' || liveVoiceUnlocked,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    _SliderSetting(
+                      label:
+                          'Speaking speed ${settings.speakingSpeed.toStringAsFixed(1)}x',
+                      value: settings.speakingSpeed,
+                      min: 0.5,
+                      max: 2.0,
+                      divisions: 15,
+                      onChanged: (value) {
+                        ref.read(settingsProvider.notifier).update(
+                              (current) =>
+                                  current.copyWith(speakingSpeed: value),
+                            );
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    _SliderSetting(
+                      label: 'Daily goal ${settings.dailyGoalMinutes} min',
+                      value: settings.dailyGoalMinutes.toDouble().clamp(5, 60),
+                      min: 5,
+                      max: 60,
+                      divisions: 11,
+                      onChanged: (value) {
+                        ref.read(settingsProvider.notifier).update(
+                              (current) => current.copyWith(
+                                dailyGoalMinutes: value.round(),
+                              ),
+                            );
+                      },
+                    ),
+                  ],
                 ),
-                Slider(
-                  min: 5,
-                  max: 60,
-                  divisions: 11,
-                  value: settings.dailyGoalMinutes.toDouble().clamp(5, 60),
-                  onChanged: (value) {
-                    ref.read(settingsProvider.notifier).update(
-                          (current) => current.copyWith(
-                            dailyGoalMinutes: value.round(),
-                          ),
-                        );
-                  },
-                ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 14),
                 FilledButton.icon(
                   onPressed: _save,
                   icon: const Icon(Icons.save_rounded),
@@ -315,6 +313,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _deepSeek.text = settings.deepSeekApiKey;
     _xai.text = settings.xaiApiKey;
     _hydrated = true;
+  }
+
+  int _connectedApiCount(AppSettings settings) {
+    return [
+      settings.groqApiKey,
+      settings.cerebrasApiKey,
+      settings.sambanovaApiKey,
+      settings.geminiApiKey,
+      settings.openRouterApiKey,
+      settings.deepSeekApiKey,
+      settings.xaiApiKey,
+    ].where((key) => key.trim().isNotEmpty).length;
+  }
+
+  String _apiSummary(AppSettings settings) {
+    final count = _connectedApiCount(settings);
+    if (count == 0) return 'Add keys and provider links only when needed';
+    if (count == 1) return 'One provider is ready for practice';
+    return '$count providers are ready for practice';
   }
 
   Future<void> _save() async {
@@ -441,6 +458,170 @@ class _PracticeModeCard extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _SettingsSectionCard extends StatelessWidget {
+  const _SettingsSectionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.children,
+    this.trailingText,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String? trailingText;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface(context),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.line(context)),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.fromLTRB(16, 8, 12, 8),
+          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          expandedCrossAxisAlignment: CrossAxisAlignment.start,
+          leading: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.softSurface(context),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: AppColors.accentPurple, size: 20),
+          ),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.primaryText(context),
+                    fontWeight: FontWeight.w900,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+              if (trailingText != null) ...[
+                const SizedBox(width: 8),
+                _TinyStatusPill(text: trailingText!),
+              ],
+            ],
+          ),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 3),
+            child: Text(
+              subtitle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: AppColors.secondaryText(context),
+                fontSize: 12,
+                height: 1.25,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          children: children,
+        ),
+      ),
+    );
+  }
+}
+
+class _TinyStatusPill extends StatelessWidget {
+  const _TinyStatusPill({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.softSurface(context),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: AppColors.accentPurple,
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniNote extends StatelessWidget {
+  const _MiniNote({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: TextStyle(
+        color: AppColors.secondaryText(context),
+        fontSize: 12,
+        height: 1.35,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+  }
+}
+
+class _SliderSetting extends StatelessWidget {
+  const _SliderSetting({
+    required this.label,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.divisions,
+    required this.onChanged,
+  });
+
+  final String label;
+  final double value;
+  final double min;
+  final double max;
+  final int divisions;
+  final ValueChanged<double> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: AppColors.primaryText(context),
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        Slider(
+          min: min,
+          max: max,
+          divisions: divisions,
+          value: value,
+          onChanged: onChanged,
+        ),
+      ],
     );
   }
 }
@@ -609,89 +790,103 @@ class _UsageCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.speed_rounded, color: AppColors.accentPurple),
-              const SizedBox(width: 10),
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.softSurface(context),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.speed_rounded,
+                  color: AppColors.accentPurple,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
               Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Usage today',
+                      style: TextStyle(
+                        color: AppColors.primaryText(context),
+                        fontWeight: FontWeight.w900,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      providerLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppColors.secondaryText(context),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(
+                    AppColors.isDark(context) ? 0.18 : 0.12,
+                  ),
+                  borderRadius: BorderRadius.circular(999),
+                ),
                 child: Text(
-                  provider?.usageTitle ?? 'Router usage',
+                  status,
                   style: TextStyle(
-                    color: AppColors.primaryText(context),
+                    color: statusColor,
+                    fontSize: 11,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: AppColors.softSurface(context),
-              borderRadius: BorderRadius.circular(18),
+          const SizedBox(height: 10),
+          Text(
+            helperLabel,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: AppColors.secondaryText(context),
+              fontSize: 12,
+              height: 1.3,
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        providerLabel,
-                        style: TextStyle(
-                          color: AppColors.primaryText(context),
-                          fontSize: 15,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        helperLabel,
-                        style: TextStyle(
-                          color: AppColors.secondaryText(context),
-                          fontSize: 12,
-                          height: 1.3,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: statusColor.withOpacity(
-                      AppColors.isDark(context) ? 0.18 : 0.12,
-                    ),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    status,
-                    style: TextStyle(
-                      color: statusColor,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          _UsageLine(
-            label: 'Requests',
-            value: summary.requests.toString(),
-            progress: _requestProgress(selectedProviderId, summary.requests),
           ),
           const SizedBox(height: 12),
-          _UsageLine(
-            label: _tokenLabel(summary),
-            value: _formatTokens(summary.displayTokens),
-            progress: _tokenProgress(selectedProviderId, summary.displayTokens),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _UsageMetricChip(
+                label: 'Requests',
+                value: summary.requests.toString(),
+                icon: Icons.call_made_rounded,
+              ),
+              _UsageMetricChip(
+                label: _tokenLabel(summary),
+                value: _formatTokens(summary.displayTokens),
+                icon: Icons.data_object_rounded,
+              ),
+              if ((provider?.hasAudioTracking ?? false) ||
+                  summary.audioSeconds > 0)
+                _UsageMetricChip(
+                  label: 'Audio',
+                  value: _formatAudio(summary.audioSeconds),
+                  icon: Icons.mic_rounded,
+                ),
+            ],
           ),
           if (summary.hasExactTokens) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Text(
               'Prompt ${_formatTokens(summary.promptTokens)}  |  Reply ${_formatTokens(summary.completionTokens)}',
               style: TextStyle(
@@ -701,70 +896,13 @@ class _UsageCard extends StatelessWidget {
               ),
             ),
           ],
-          if ((provider?.hasAudioTracking ?? false) ||
-              summary.audioSeconds > 0) ...[
-            const SizedBox(height: 12),
-            _UsageLine(
-              label: 'Audio',
-              value: _formatAudio(summary.audioSeconds),
-              progress:
-                  _audioProgress(selectedProviderId, summary.audioSeconds),
-            ),
-          ],
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.softSurface(context),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  selectedProviderId == 'none'
-                      ? 'Connection status'
-                      : provider?.billingLabel ?? 'Mixed usage',
-                  style: TextStyle(
-                    color: AppColors.primaryText(context),
-                    fontWeight: FontWeight.w900,
-                    fontSize: 12,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  selectedProviderId == 'none'
-                      ? 'Add any supported API key below and this card will automatically reflect the provider you are actually using.'
-                      : provider?.usageSummary ??
-                          'This combines local usage tracked across the providers you have configured.',
-                  style: TextStyle(
-                    color: AppColors.secondaryText(context),
-                    fontSize: 12,
-                    height: 1.35,
-                  ),
-                ),
-                if (selectedProviderId != 'none') ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    _tokenSourceNote(summary),
-                    style: TextStyle(
-                      color: AppColors.secondaryText(context),
-                      fontSize: 11,
-                      height: 1.35,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          if (selectedProviderId == 'gemini') ...[
+          if (selectedProviderId != 'none' && summary.displayTokens > 0) ...[
             const SizedBox(height: 10),
             Text(
-              'Remaining Gemini credits are managed in Google AI Studio and are not exposed directly to this app.',
+              _tokenSourceNote(summary),
               style: TextStyle(
                 color: AppColors.secondaryText(context),
-                fontSize: 12,
+                fontSize: 11,
                 height: 1.35,
               ),
             ),
@@ -775,6 +913,7 @@ class _UsageCard extends StatelessWidget {
               '~$practiceMinutesLeft min practice left today',
               style: const TextStyle(
                 color: AppColors.accentPurple,
+                fontSize: 13,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -901,77 +1040,66 @@ class _UsageCard extends StatelessWidget {
     final minutes = (audioSeconds / 60).floor();
     return '$minutes min';
   }
-
-  double _requestProgress(String providerId, int requests) {
-    return switch (providerId) {
-      'gemini' => requests / 60,
-      'deepseek' => requests / 60,
-      'auto' => requests / 40,
-      _ => requests / 30,
-    };
-  }
-
-  double _tokenProgress(String providerId, int tokens) {
-    return switch (providerId) {
-      'groq' => tokens / 100000,
-      'gemini' => tokens / 50000,
-      'deepseek' => tokens / 100000,
-      _ => tokens / 50000,
-    };
-  }
-
-  double _audioProgress(String providerId, int audioSeconds) {
-    return switch (providerId) {
-      'groq' => audioSeconds / 28800,
-      _ => audioSeconds / 3600,
-    };
-  }
 }
 
-class _UsageLine extends StatelessWidget {
-  const _UsageLine({
+class _UsageMetricChip extends StatelessWidget {
+  const _UsageMetricChip({
     required this.label,
     required this.value,
-    required this.progress,
+    required this.icon,
   });
 
   final String label;
   final String value;
-  final double progress;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                label,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: AppColors.secondaryText(context)),
+    return Container(
+      width: 105,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.softSurface(context),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                icon,
+                color: AppColors.accentPurple,
+                size: 17,
               ),
-            ),
-            const SizedBox(width: 12),
-            Flexible(
-              child: Text(
-                value,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.right,
-                style: const TextStyle(fontWeight: FontWeight.w800),
+              const Spacer(),
+              Flexible(
+                child: Text(
+                  value,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    color: AppColors.primaryText(context),
+                    fontWeight: FontWeight.w900,
+                    fontSize: 14,
+                  ),
+                ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(999),
-          child: LinearProgressIndicator(
-            minHeight: 7,
-            value: progress.clamp(0, 1),
+            ],
           ),
-        ),
-      ],
+          const SizedBox(height: 6),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: AppColors.secondaryText(context),
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1033,25 +1161,6 @@ class _AppearanceCard extends StatelessWidget {
           ),
           Switch(value: isDarkMode, onChanged: onChanged),
         ],
-      ),
-    );
-  }
-}
-
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Text(
-        text,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w900,
-            ),
       ),
     );
   }

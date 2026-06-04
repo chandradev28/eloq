@@ -102,7 +102,6 @@ class HomeScreen extends ConsumerWidget {
                   const SizedBox(height: 16),
                   _HandsfreePracticeCard(
                     onTap: () => context.push('/live-voice'),
-                    onFallbackTap: () => context.push('/handsfree'),
                   ),
                   const SizedBox(height: 16),
                   _StripedPracticeCard(
@@ -582,11 +581,9 @@ class _StripedPracticeCard extends StatelessWidget {
 class _HandsfreePracticeCard extends StatelessWidget {
   const _HandsfreePracticeCard({
     required this.onTap,
-    required this.onFallbackTap,
   });
 
   final VoidCallback onTap;
-  final VoidCallback onFallbackTap;
 
   @override
   Widget build(BuildContext context) {
@@ -635,7 +632,7 @@ class _HandsfreePracticeCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'One open Gemini-powered voice session with transcript, timer, and coach prompt.',
+                        'Choose native audio or standard voice inside one focused speaking session.',
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -645,28 +642,8 @@ class _HandsfreePracticeCard extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton.icon(
-                          style: TextButton.styleFrom(
-                            foregroundColor: Colors.white,
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            visualDensity: VisualDensity.compact,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 0,
-                              vertical: 4,
-                            ),
-                          ),
-                          onPressed: onFallbackTap,
-                          icon: const Icon(
-                            Icons.history_toggle_off_rounded,
-                            size: 18,
-                          ),
-                          label: const Text('Use fallback'),
-                        ),
-                      ),
+                      const Spacer(),
+                      const _SoftChip(text: 'Switch modes inside'),
                     ],
                   ),
                 ),

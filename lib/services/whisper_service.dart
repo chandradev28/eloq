@@ -1,8 +1,16 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class WhisperService {
-  WhisperService({Dio? dio}) : _dio = dio ?? Dio();
+  WhisperService({Dio? dio})
+      : _dio = dio ??
+            Dio(BaseOptions(
+              connectTimeout: const Duration(seconds: 8),
+              sendTimeout: const Duration(seconds: 12),
+              receiveTimeout: const Duration(seconds: 20),
+            ));
 
   final Dio _dio;
 
@@ -21,14 +29,21 @@ class WhisperService {
       'file': await MultipartFile.fromFile(filePath),
     });
 
-    final response = await _dio.post<Map<String, dynamic>>(
-      'https://api.groq.com/openai/v1/audio/transcriptions',
-      options: Options(headers: {'Authorization': 'Bearer $apiKey'}),
-      data: form,
-    );
+    final response = await _dio
+        .post<Map<String, dynamic>>(
+          'https://api.groq.com/openai/v1/audio/transcriptions',
+          options: Options(
+            sendTimeout: const Duration(seconds: 12),
+            receiveTimeout: const Duration(seconds: 20),
+            headers: {'Authorization': 'Bearer $apiKey'},
+          ),
+          data: form,
+        )
+        .timeout(const Duration(seconds: 24));
 
     return response.data?['text']?.toString().trim() ?? '';
   }
 }
 
-final whisperServiceProvider = Provider<WhisperService>((ref) => WhisperService());
+final whisperServiceProvider =
+    Provider<WhisperService>((ref) => WhisperService());

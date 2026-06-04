@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -46,10 +47,19 @@ class _ProviderResult {
 }
 
 class LlmRouterService {
-  LlmRouterService({Dio? dio}) : _dio = dio ?? Dio();
+  LlmRouterService({Dio? dio})
+      : _dio = dio ??
+            Dio(BaseOptions(
+              connectTimeout: _connectTimeout,
+              sendTimeout: _sendTimeout,
+              receiveTimeout: _defaultRequestTimeout,
+            ));
 
   final Dio _dio;
   final Map<String, DateTime> _cooldowns = {};
+  static const _connectTimeout = Duration(seconds: 8);
+  static const _sendTimeout = Duration(seconds: 10);
+  static const _defaultRequestTimeout = Duration(seconds: 18);
 
   Future<LlmResponse> sendMessage({
     required AppSettings settings,
@@ -60,6 +70,9 @@ class LlmRouterService {
     String learnerContext = '',
     int maxOutputTokens = 300,
     int maxHistoryMessages = 6,
+    List<String>? allowedProviderIds,
+    bool preferLowLatency = false,
+    Duration requestTimeout = _defaultRequestTimeout,
   }) async {
     if (!settings.hasAnyLlmKey) {
       return _demoResponse(topic, userText, settings.difficulty);
@@ -85,12 +98,7 @@ class LlmRouterService {
     ];
 
     final providers = [
-      _ProviderConfig(
-        id: 'groq',
-        apiKey: settings.groqApiKey,
-        baseUrl: 'https://api.groq.com/openai/v1',
-        model: settings.groqChatModel,
-      ),
+      ..._groqProviders(settings, preferLowLatency: preferLowLatency),
       _ProviderConfig(
         id: 'cerebras',
         apiKey: settings.cerebrasApiKey,
@@ -124,13 +132,18 @@ class LlmRouterService {
         model: settings.deepSeekChatModel,
       ),
     ];
+    final allowed = allowedProviderIds?.toSet();
+    final readyProviders = allowed == null
+        ? providers
+        : providers.where((provider) => allowed.contains(provider.id)).toList();
     final orderedProviders = _orderProviders(
-      providers,
+      readyProviders,
       settings.preferredProvider,
     );
+    final failures = <String>[];
 
     for (final provider in orderedProviders) {
-      if (!provider.isReady || _isCoolingDown(provider.id)) continue;
+      if (!provider.isReady || _isCoolingDown(provider.cooldownKey)) continue;
       try {
         final result = provider.isGemini
             ? await _sendGemini(
@@ -140,11 +153,13 @@ class LlmRouterService {
                 userText,
                 maxOutputTokens: maxOutputTokens,
                 maxHistoryMessages: maxHistoryMessages,
+                requestTimeout: requestTimeout,
               )
             : await _sendOpenAiCompatible(
                 provider,
                 openAiMessages,
                 maxOutputTokens: maxOutputTokens,
+                requestTimeout: requestTimeout,
               );
         final exactTotalTokens = result.totalTokens;
         return _parseResponse(
@@ -159,19 +174,28 @@ class LlmRouterService {
           isTokenUsageEstimated: exactTotalTokens <= 0,
         );
       } on DioException catch (error) {
-        final status = error.response?.statusCode ?? 0;
-        if (status == 429 || status >= 500) {
-          _cooldowns[provider.id] =
+        failures.add(_failureText(provider, error));
+        if (_shouldCooldown(error)) {
+          _cooldowns[provider.cooldownKey] =
               DateTime.now().add(const Duration(seconds: 60));
-          continue;
         }
-      } catch (_) {}
+        continue;
+      } on TimeoutException {
+        failures.add('${provider.label} timed out.');
+        _cooldowns[provider.cooldownKey] =
+            DateTime.now().add(const Duration(seconds: 45));
+        continue;
+      } catch (error) {
+        failures.add('${provider.label}: $error');
+        continue;
+      }
     }
 
     final demo = _demoResponse(topic, userText, settings.difficulty);
+    final reason = failures.isEmpty ? '' : ' (${failures.first})';
     return LlmResponse(
       text:
-          '${demo.text} I could not reach the configured AI providers, so this is a local practice reply.',
+          '${demo.text} I could not reach the configured AI providers quickly$reason, so this is a local practice reply.',
       provider: 'fallback',
       model: 'local',
       corrections: demo.corrections,
@@ -234,6 +258,7 @@ class LlmRouterService {
           'OK',
           maxOutputTokens: 32,
           maxHistoryMessages: 1,
+          requestTimeout: const Duration(seconds: 10),
         );
       } else {
         await _sendOpenAiCompatible(
@@ -242,6 +267,7 @@ class LlmRouterService {
             {'role': 'user', 'content': 'Reply with OK.'},
           ],
           maxOutputTokens: 32,
+          requestTimeout: const Duration(seconds: 10),
         );
       }
       return null;
@@ -256,10 +282,13 @@ class LlmRouterService {
     _ProviderConfig provider,
     List<Map<String, String>> messages, {
     required int maxOutputTokens,
+    required Duration requestTimeout,
   }) async {
     final response = await _dio.post<Map<String, dynamic>>(
       '${provider.baseUrl}/chat/completions',
       options: Options(
+        sendTimeout: _sendTimeout,
+        receiveTimeout: requestTimeout,
         headers: {
           'Authorization': 'Bearer ${provider.apiKey}',
           'Content-Type': 'application/json',
@@ -273,7 +302,7 @@ class LlmRouterService {
         'max_tokens': maxOutputTokens,
         'stream': false,
       },
-    );
+    ).timeout(requestTimeout + const Duration(seconds: 2));
 
     final usage = response.data?['usage'];
     return _ProviderResult(
@@ -292,6 +321,7 @@ class LlmRouterService {
     String userText, {
     required int maxOutputTokens,
     required int maxHistoryMessages,
+    required Duration requestTimeout,
   }) async {
     final transcript = StringBuffer(systemPrompt);
     for (final message
@@ -303,6 +333,10 @@ class LlmRouterService {
 
     final response = await _dio.post<Map<String, dynamic>>(
       'https://generativelanguage.googleapis.com/v1beta/models/${provider.model}:generateContent?key=${provider.apiKey}',
+      options: Options(
+        sendTimeout: _sendTimeout,
+        receiveTimeout: requestTimeout,
+      ),
       data: {
         'contents': [
           {
@@ -316,7 +350,7 @@ class LlmRouterService {
           'maxOutputTokens': maxOutputTokens,
         },
       },
-    );
+    ).timeout(requestTimeout + const Duration(seconds: 2));
 
     final usage = response.data?['usageMetadata'];
     return _ProviderResult(
@@ -377,11 +411,11 @@ class LlmRouterService {
     );
   }
 
-  bool _isCoolingDown(String id) {
-    final until = _cooldowns[id];
+  bool _isCoolingDown(String key) {
+    final until = _cooldowns[key];
     if (until == null) return false;
     if (DateTime.now().isAfter(until)) {
-      _cooldowns.remove(id);
+      _cooldowns.remove(key);
       return false;
     }
     return true;
@@ -439,6 +473,53 @@ class LlmRouterService {
     final remaining = providers.where((item) => item.id != preferredProvider);
     return [...preferred, ...remaining];
   }
+
+  List<_ProviderConfig> _groqProviders(
+    AppSettings settings, {
+    required bool preferLowLatency,
+  }) {
+    const scout = 'meta-llama/llama-4-scout-17b-16e-instruct';
+    const maverick = 'meta-llama/llama-4-maverick-17b-128e-instruct';
+    final models = settings.isGroqSmartMode && !preferLowLatency
+        ? const [maverick, scout]
+        : const [scout];
+    return [
+      for (final model in models)
+        _ProviderConfig(
+          id: 'groq',
+          apiKey: settings.groqApiKey,
+          baseUrl: 'https://api.groq.com/openai/v1',
+          model: model,
+        ),
+    ];
+  }
+
+  bool _shouldCooldown(DioException error) {
+    final status = error.response?.statusCode ?? 0;
+    return error.type == DioExceptionType.connectionTimeout ||
+        error.type == DioExceptionType.receiveTimeout ||
+        error.type == DioExceptionType.sendTimeout ||
+        status == 400 ||
+        status == 401 ||
+        status == 403 ||
+        status == 404 ||
+        status == 429 ||
+        status >= 500;
+  }
+
+  String _failureText(_ProviderConfig provider, DioException error) {
+    final status = error.response?.statusCode;
+    if (status == 403 && provider.id == 'groq') {
+      return '${provider.label} is not enabled for this Groq project.';
+    }
+    if (status == 429) {
+      return '${provider.label} is rate limited.';
+    }
+    if (status != null) {
+      return '${provider.label} returned HTTP $status.';
+    }
+    return '${provider.label}: ${error.message ?? error.type.name}.';
+  }
 }
 
 class _ProviderConfig {
@@ -459,6 +540,20 @@ class _ProviderConfig {
   final bool isGemini;
 
   bool get isReady => apiKey.trim().isNotEmpty;
+
+  String get cooldownKey => '$id:$model';
+
+  String get label => switch (id) {
+        'groq' when model.contains('maverick') => 'Groq Maverick',
+        'groq' when model.contains('scout') => 'Groq Scout',
+        'groq' => 'Groq',
+        'cerebras' => 'Cerebras',
+        'sambanova' => 'SambaNova',
+        'gemini' => 'Gemini',
+        'openrouter' => 'OpenRouter',
+        'deepseek' => 'DeepSeek',
+        _ => id,
+      };
 }
 
 final llmRouterServiceProvider = Provider<LlmRouterService>((ref) {

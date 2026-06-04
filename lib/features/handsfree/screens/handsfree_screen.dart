@@ -8,6 +8,7 @@ import '../../../core/widgets/brand_logo.dart';
 import '../../../models/conversation_session.dart';
 import '../../conversation/widgets/chat_bubble.dart';
 import '../../conversation/widgets/typing_indicator.dart';
+import '../../voice/widgets/voice_mode_switch.dart';
 import '../providers/handsfree_provider.dart';
 
 class HandsfreeScreen extends ConsumerStatefulWidget {
@@ -77,7 +78,7 @@ class _HandsfreeScreenState extends ConsumerState<HandsfreeScreen>
             child: Column(
               children: [
                 _HandsfreeTopBar(
-                  title: 'Handsfree',
+                  title: 'Voice Practice',
                   onBack: () => context.pop(),
                   onOptions: () =>
                       _openSessionSetup(context, controller, state),
@@ -90,6 +91,11 @@ class _HandsfreeScreenState extends ConsumerState<HandsfreeScreen>
                       spacing: 8,
                       runSpacing: 8,
                       children: [
+                        VoiceModeSwitch(
+                          selectedMode: VoicePracticeMode.standard,
+                          onNativeTap: () => context.go('/live-voice'),
+                          onStandardTap: () {},
+                        ),
                         _ModePill(icon: topic.icon, label: topic.name),
                         _ModePill(
                           icon: Icons.timer_outlined,
@@ -417,7 +423,6 @@ class _HandsfreeScreenState extends ConsumerState<HandsfreeScreen>
     promptController.dispose();
     resumeController.dispose();
   }
-
 }
 
 class _IdleStage extends StatelessWidget {
@@ -533,8 +538,7 @@ class _TranscriptStage extends StatelessWidget {
             child: _VoiceOrb(
               pulse: pulse,
               large: false,
-              active:
-                  state.isRecording ||
+              active: state.isRecording ||
                   state.isSpeaking ||
                   state.isThinking ||
                   state.isTranscribing,

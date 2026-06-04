@@ -9,6 +9,7 @@ import '../../../models/conversation_session.dart';
 import '../../conversation/models/message.dart';
 import '../../conversation/widgets/chat_bubble.dart';
 import '../../conversation/widgets/typing_indicator.dart';
+import '../../voice/widgets/voice_mode_switch.dart';
 import '../providers/live_voice_provider.dart';
 
 class LiveVoiceScreen extends ConsumerStatefulWidget {
@@ -56,7 +57,7 @@ class _LiveVoiceScreenState extends ConsumerState<LiveVoiceScreen>
     final statusLabel = state.timerFinished
         ? 'Session complete'
         : state.isConnecting
-            ? 'Connecting to Gemini'
+            ? 'Connecting to voice coach'
             : state.isSpeaking
                 ? 'Speaking'
                 : state.isListening
@@ -85,9 +86,10 @@ class _LiveVoiceScreenState extends ConsumerState<LiveVoiceScreen>
                       spacing: 8,
                       runSpacing: 8,
                       children: [
-                        const _ModePill(
-                          icon: Icons.graphic_eq_rounded,
-                          label: 'Gemini Live',
+                        VoiceModeSwitch(
+                          selectedMode: VoicePracticeMode.nativeAudio,
+                          onNativeTap: () {},
+                          onStandardTap: () => context.go('/handsfree'),
                         ),
                         _ModePill(icon: topic.icon, label: topic.name),
                         _ModePill(
@@ -116,7 +118,7 @@ class _LiveVoiceScreenState extends ConsumerState<LiveVoiceScreen>
                             key: const ValueKey('live-idle'),
                             statusLabel: statusLabel,
                             description:
-                                'One open Gemini session for natural voice practice. If it is unavailable, jump into standard handsfree.',
+                                'Native audio keeps the conversation open with a faster voice-first flow.',
                             pulse: _pulse,
                             active: state.isConnecting ||
                                 state.isListening ||
@@ -142,19 +144,13 @@ class _LiveVoiceScreenState extends ConsumerState<LiveVoiceScreen>
                   const Padding(
                     padding: EdgeInsets.only(bottom: 8),
                     child: TypingIndicator(
-                        label: 'Opening a Gemini live session...'),
+                        label: 'Opening your voice practice...'),
                   ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(18, 10, 18, 22),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _CircleActionButton(
-                        icon: Icons.history_toggle_off_rounded,
-                        tooltip: 'Standard handsfree fallback',
-                        onTap: () => context.push('/handsfree'),
-                      ),
-                      const SizedBox(width: 18),
                       _CircleActionButton(
                         icon: state.isSessionActive || state.isConnecting
                             ? Icons.stop_rounded
@@ -238,7 +234,7 @@ class _LiveVoiceScreenState extends ConsumerState<LiveVoiceScreen>
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Choose the topic, timer, and coach prompt for this Gemini-powered session.',
+                          'Choose the topic, timer, and coach prompt for this AI speaking session.',
                           style: TextStyle(
                             color: AppColors.secondaryText(context),
                             height: 1.35,
@@ -332,7 +328,7 @@ class _LiveVoiceScreenState extends ConsumerState<LiveVoiceScreen>
                           spacing: 10,
                           runSpacing: 10,
                           children: [
-                            OutlinedButton.icon(
+                            FilledButton.icon(
                               onPressed: () async {
                                 await controller.applySetup(
                                   topicId: selectedTopicId,
@@ -366,15 +362,6 @@ class _LiveVoiceScreenState extends ConsumerState<LiveVoiceScreen>
                               label: const Text('New session'),
                             ),
                             OutlinedButton.icon(
-                              onPressed: () {
-                                Navigator.of(sheetContext).pop();
-                                context.push('/handsfree');
-                              },
-                              icon:
-                                  const Icon(Icons.history_toggle_off_rounded),
-                              label: const Text('Use fallback'),
-                            ),
-                            FilledButton.icon(
                               onPressed: () async {
                                 await controller.applySetup(
                                   topicId: selectedTopicId,
@@ -433,7 +420,7 @@ class _LiveTopBar extends StatelessWidget {
           const SizedBox(width: 12),
           const Expanded(
             child: Text(
-              'Live Voice',
+              'Voice Practice',
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: Colors.white,
