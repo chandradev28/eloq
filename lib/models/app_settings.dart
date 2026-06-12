@@ -1,8 +1,6 @@
 class AppSettings {
   const AppSettings({
     this.groqApiKey = '',
-    this.cerebrasApiKey = '',
-    this.sambanovaApiKey = '',
     this.geminiApiKey = '',
     this.openRouterApiKey = '',
     this.deepSeekApiKey = '',
@@ -22,8 +20,6 @@ class AppSettings {
   });
 
   final String groqApiKey;
-  final String cerebrasApiKey;
-  final String sambanovaApiKey;
   final String geminiApiKey;
   final String openRouterApiKey;
   final String deepSeekApiKey;
@@ -47,8 +43,6 @@ class AppSettings {
   bool get hasXaiKey => xaiApiKey.trim().isNotEmpty;
   bool get hasAnyLlmKey =>
       hasGroqKey ||
-      cerebrasApiKey.trim().isNotEmpty ||
-      sambanovaApiKey.trim().isNotEmpty ||
       geminiApiKey.trim().isNotEmpty ||
       hasDeepSeekKey ||
       openRouterApiKey.trim().isNotEmpty;
@@ -104,8 +98,6 @@ class AppSettings {
 
   AppSettings copyWith({
     String? groqApiKey,
-    String? cerebrasApiKey,
-    String? sambanovaApiKey,
     String? geminiApiKey,
     String? openRouterApiKey,
     String? deepSeekApiKey,
@@ -125,8 +117,6 @@ class AppSettings {
   }) {
     return AppSettings(
       groqApiKey: groqApiKey ?? this.groqApiKey,
-      cerebrasApiKey: cerebrasApiKey ?? this.cerebrasApiKey,
-      sambanovaApiKey: sambanovaApiKey ?? this.sambanovaApiKey,
       geminiApiKey: geminiApiKey ?? this.geminiApiKey,
       openRouterApiKey: openRouterApiKey ?? this.openRouterApiKey,
       deepSeekApiKey: deepSeekApiKey ?? this.deepSeekApiKey,
@@ -179,7 +169,13 @@ class AppSettings {
         'pro' => 'pro',
         _ => 'flash',
       },
-      preferredProvider: json['preferredProvider']?.toString() ?? 'auto',
+      preferredProvider: switch (json['preferredProvider']?.toString()) {
+        'groq' => 'groq',
+        'gemini' => 'gemini',
+        'openrouter' => 'openrouter',
+        'deepseek' => 'deepseek',
+        _ => 'auto',
+      },
       voiceName: json['voiceName']?.toString() ?? '',
       speakingSpeed: (json['speakingSpeed'] as num?)?.toDouble() ?? 1.0,
       accent: json['accent']?.toString() ?? 'US',

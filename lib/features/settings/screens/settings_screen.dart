@@ -21,8 +21,6 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _groq = TextEditingController();
-  final _cerebras = TextEditingController();
-  final _sambanova = TextEditingController();
   final _gemini = TextEditingController();
   final _openRouter = TextEditingController();
   final _deepSeek = TextEditingController();
@@ -34,8 +32,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   void dispose() {
     _groq.dispose();
-    _cerebras.dispose();
-    _sambanova.dispose();
     _gemini.dispose();
     _openRouter.dispose();
     _deepSeek.dispose();
@@ -103,20 +99,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       status: _validation['groq'],
                       validating: _validating.contains('groq'),
                       onTest: () => _testKey('groq', _groq.text),
-                    ),
-                    _KeyField(
-                      controller: _cerebras,
-                      label: 'Cerebras API key',
-                      status: _validation['cerebras'],
-                      validating: _validating.contains('cerebras'),
-                      onTest: () => _testKey('cerebras', _cerebras.text),
-                    ),
-                    _KeyField(
-                      controller: _sambanova,
-                      label: 'SambaNova API key',
-                      status: _validation['sambanova'],
-                      validating: _validating.contains('sambanova'),
-                      onTest: () => _testKey('sambanova', _sambanova.text),
                     ),
                     _KeyField(
                       controller: _gemini,
@@ -306,8 +288,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   void _hydrate(AppSettings settings) {
     _groq.text = settings.groqApiKey;
-    _cerebras.text = settings.cerebrasApiKey;
-    _sambanova.text = settings.sambanovaApiKey;
     _gemini.text = settings.geminiApiKey;
     _openRouter.text = settings.openRouterApiKey;
     _deepSeek.text = settings.deepSeekApiKey;
@@ -318,8 +298,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   int _connectedApiCount(AppSettings settings) {
     return [
       settings.groqApiKey,
-      settings.cerebrasApiKey,
-      settings.sambanovaApiKey,
       settings.geminiApiKey,
       settings.openRouterApiKey,
       settings.deepSeekApiKey,
@@ -339,8 +317,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await ref.read(settingsProvider.notifier).save(
           current.copyWith(
             groqApiKey: _groq.text,
-            cerebrasApiKey: _cerebras.text,
-            sambanovaApiKey: _sambanova.text,
             geminiApiKey: _gemini.text,
             openRouterApiKey: _openRouter.text,
             deepSeekApiKey: _deepSeek.text,
@@ -937,8 +913,6 @@ class _UsageCard extends StatelessWidget {
     for (final providerId in const [
       'groq',
       'gemini',
-      'cerebras',
-      'sambanova',
       'openrouter',
       'deepseek',
     ]) {
@@ -953,8 +927,6 @@ class _UsageCard extends StatelessWidget {
     return switch (providerId) {
       'groq' => settings.hasGroqKey,
       'gemini' => settings.geminiApiKey.trim().isNotEmpty,
-      'cerebras' => settings.cerebrasApiKey.trim().isNotEmpty,
-      'sambanova' => settings.sambanovaApiKey.trim().isNotEmpty,
       'openrouter' => settings.openRouterApiKey.trim().isNotEmpty,
       'deepseek' => settings.deepSeekApiKey.trim().isNotEmpty,
       _ => false,

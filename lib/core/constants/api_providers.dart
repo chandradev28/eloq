@@ -46,30 +46,6 @@ class ApiProviders {
     isRequired: true,
   );
 
-  static const cerebras = ApiProviderInfo(
-    id: 'cerebras',
-    name: 'Cerebras',
-    url: 'https://cloud.cerebras.ai/platform',
-    kind: 'Free',
-    description: 'Extra free AI capacity for daily practice.',
-    icon: Icons.bolt_rounded,
-    usageTitle: 'Cerebras usage',
-    usageSummary: 'Tracks local request count and estimated chat tokens.',
-    billingLabel: 'Free capacity',
-  );
-
-  static const sambanova = ApiProviderInfo(
-    id: 'sambanova',
-    name: 'SambaNova',
-    url: 'https://cloud.sambanova.ai/',
-    kind: 'Free',
-    description: 'Optional free AI capacity for more practice room.',
-    icon: Icons.cloud_queue_rounded,
-    usageTitle: 'SambaNova usage',
-    usageSummary: 'Tracks local request count and estimated chat tokens.',
-    billingLabel: 'Free capacity',
-  );
-
   static const gemini = ApiProviderInfo(
     id: 'gemini',
     name: 'Gemini',
@@ -125,8 +101,6 @@ class ApiProviders {
 
   static const free = [
     groq,
-    cerebras,
-    sambanova,
     gemini,
     openRouter,
     deepSeek,
@@ -134,8 +108,6 @@ class ApiProviders {
   static const premium = [xai];
   static const all = [
     groq,
-    cerebras,
-    sambanova,
     gemini,
     openRouter,
     deepSeek,

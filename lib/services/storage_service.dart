@@ -34,9 +34,6 @@ class StorageService {
       final geminiApiKey = await _secureStorage.read(key: 'geminiApiKey') ?? '';
       return base.copyWith(
         groqApiKey: await _secureStorage.read(key: 'groqApiKey') ?? '',
-        cerebrasApiKey: await _secureStorage.read(key: 'cerebrasApiKey') ?? '',
-        sambanovaApiKey:
-            await _secureStorage.read(key: 'sambanovaApiKey') ?? '',
         geminiApiKey: geminiApiKey,
         openRouterApiKey:
             await _secureStorage.read(key: 'openRouterApiKey') ?? '',
@@ -54,8 +51,6 @@ class StorageService {
     final box = await Hive.openBox(_settingsBoxName);
     await box.put(_settingsKey, settings.toJson());
     await _writeSecret('groqApiKey', settings.groqApiKey);
-    await _writeSecret('cerebrasApiKey', settings.cerebrasApiKey);
-    await _writeSecret('sambanovaApiKey', settings.sambanovaApiKey);
     await _writeSecret('geminiApiKey', settings.geminiApiKey);
     await _writeSecret('openRouterApiKey', settings.openRouterApiKey);
     await _writeSecret('deepSeekApiKey', settings.deepSeekApiKey);

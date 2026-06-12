@@ -109,18 +109,6 @@ class LlmRouterService {
             : requestTimeout,
       ),
       _ProviderConfig(
-        id: 'cerebras',
-        apiKey: settings.cerebrasApiKey,
-        baseUrl: 'https://api.cerebras.ai/v1',
-        model: 'qwen-3-235b-instruct',
-      ),
-      _ProviderConfig(
-        id: 'sambanova',
-        apiKey: settings.sambanovaApiKey,
-        baseUrl: 'https://api.sambanova.ai/v1',
-        model: 'Meta-Llama-3.3-70B-Instruct',
-      ),
-      _ProviderConfig(
         id: 'gemini',
         apiKey: settings.geminiApiKey,
         baseUrl: '',
@@ -234,18 +222,6 @@ class LlmRouterService {
             apiKey: apiKey,
             baseUrl: 'https://api.groq.com/openai/v1',
             model: 'llama-3.1-8b-instant',
-          ),
-        'cerebras' => _ProviderConfig(
-            id: 'cerebras',
-            apiKey: apiKey,
-            baseUrl: 'https://api.cerebras.ai/v1',
-            model: 'qwen-3-235b-instruct',
-          ),
-        'sambanova' => _ProviderConfig(
-            id: 'sambanova',
-            apiKey: apiKey,
-            baseUrl: 'https://api.sambanova.ai/v1',
-            model: 'Meta-Llama-3.3-70B-Instruct',
           ),
         'gemini' => _ProviderConfig(
             id: 'gemini',
@@ -632,8 +608,6 @@ class _ProviderConfig {
         'groq' when model == 'openai/gpt-oss-120b' => 'Groq Smart',
         'groq' when model == 'llama-3.1-8b-instant' => 'Groq Fast',
         'groq' => 'Groq',
-        'cerebras' => 'Cerebras',
-        'sambanova' => 'SambaNova',
         'gemini' => 'Gemini',
         'openrouter' => 'OpenRouter',
         'deepseek' => 'DeepSeek',

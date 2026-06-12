@@ -1,6 +1,6 @@
 # ELOQ — Full App Specification for Codex
 
-> **One-line summary:** A Flutter mobile app for practicing English speaking through voice conversations with AI. Completely free — uses multi-provider LLM rotation (Groq, Cerebras, SambaNova, Gemini, OpenRouter) for essentially unlimited free AI, Groq Whisper for STT, and device-native TTS for voice output. Optional premium tier via xAI Grok Voice for high-quality speech-to-speech.
+> **One-line summary:** A Flutter mobile app for practicing English speaking through voice conversations with AI. Uses Groq, Gemini, OpenRouter, and DeepSeek for AI responses, Groq Whisper for STT, and device-native TTS for voice output. Optional premium voice capabilities can be added through xAI.
 
 ---
 
@@ -125,8 +125,6 @@ lib/
 ├── services/
 │   ├── llm_router_service.dart    # CORE: Multi-provider LLM router with auto-fallback
 │   ├── groq_service.dart          # Groq API: Llama 3.3 70B (OpenAI-compatible)
-│   ├── cerebras_service.dart      # Cerebras API: Qwen 3 235B, Llama (OpenAI-compatible)
-│   ├── sambanova_service.dart     # SambaNova API: Llama, Qwen, DeepSeek (OpenAI-compatible)
 │   ├── gemini_service.dart        # Gemini API: Gemini 2.0 Flash (Google format)
 │   ├── openrouter_service.dart    # OpenRouter API: Any free model (OpenAI-compatible)
 │   ├── whisper_service.dart       # Groq API: Whisper transcription
@@ -255,8 +253,6 @@ Bottom Nav: [Home] [Topics] [Progress] [Vocab] [Settings]
 - **Voice Mode Toggle**: Free Mode / Premium Mode (xAI)
 - **API Keys Section** (expandable, each with masked input + test button):
   - Groq API Key — REQUIRED (used for LLM + Whisper STT)
-  - Cerebras API Key — recommended (free Qwen 3 235B)
-  - SambaNova API Key — optional
   - Gemini API Key — recommended
   - OpenRouter API Key — optional
   - xAI API Key — optional (enables premium voice mode)
@@ -318,10 +314,9 @@ The app uses `llm_router_service.dart` to automatically rotate between free LLM 
 **Fallback Chain (in order):**
 ```
 1. Groq        → fastest, try first
-2. Cerebras    → Qwen 3 235B (massive model, free)
-3. SambaNova   → Llama/Qwen/DeepSeek
-4. Gemini      → most reliable, different API format
-5. OpenRouter  → any available free model
+2. Gemini      → reliable alternative and native audio
+3. OpenRouter  → available community models
+4. DeepSeek    → optional text provider
 ```
 
 If provider N returns 429 (rate limited) or 5xx (error), immediately try provider N+1. Track which providers are currently rate-limited and skip them for a cooldown period (default: 60 seconds).
@@ -334,23 +329,7 @@ Free Limits: ~6,000 req/day, 300K tokens/day
 Auth: Bearer {GROQ_API_KEY}
 ```
 
-### Provider 2: Cerebras
-```
-Base URL: https://api.cerebras.ai/v1
-Model: qwen-3-235b-instruct (235B params — FREE!)
-Free Limits: 1M tokens/day, 30 RPM
-Auth: Bearer {CEREBRAS_API_KEY}
-```
-
-### Provider 3: SambaNova
-```
-Base URL: https://api.sambanova.ai/v1
-Model: Meta-Llama-3.3-70B-Instruct (or Qwen2.5-72B-Instruct)
-Free Limits: $5 credit on signup, persistent free tier after
-Auth: Bearer {SAMBANOVA_API_KEY}
-```
-
-### Provider 4: Google Gemini (different API format)
+### Provider 2: Google Gemini (different API format)
 ```
 POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}
 Headers:
@@ -363,7 +342,7 @@ Body:
 Free Limits: 15 RPM, 1M tokens/day
 ```
 
-### Provider 5: OpenRouter (Fallback Router)
+### Provider 3: OpenRouter
 ```
 Base URL: https://openrouter.ai/api/v1
 Model: openrouter/free (auto-selects best available free model)
@@ -374,7 +353,7 @@ Auth: Bearer {OPENROUTER_API_KEY}
 Extra Header: HTTP-Referer: https://eloq.app
 ```
 
-### OpenAI-Compatible Payload (used by Groq, Cerebras, SambaNova, OpenRouter)
+### OpenAI-Compatible Payload (used by Groq, OpenRouter, and DeepSeek)
 ```json
 POST {base_url}/chat/completions
 Headers:
@@ -412,13 +391,11 @@ Body:
 | Provider | Signup URL | Time | Required? |
 |----------|-----------|------|----------|
 | Groq | console.groq.com | 30s | ✅ Required (also for Whisper STT) |
-| Cerebras | cloud.cerebras.ai | 30s | 🟡 Recommended |
-| SambaNova | cloud.sambanova.ai | 30s | 🟡 Optional |
 | Gemini | aistudio.google.com | 30s | 🟡 Recommended |
 | OpenRouter | openrouter.ai | 30s | 🟡 Optional |
 | xAI | console.x.ai | 30s | 🟡 Optional (premium voice) |
 
-> The more keys the user adds, the more free capacity they have. Minimum: just Groq. Maximum: all 6 providers for essentially unlimited free usage.
+> Groq is the minimum key for standard voice transcription. Additional supported providers can extend chat capacity.
 
 ### Combined Free Limits (if user adds ALL keys)
 | Resource | Daily Free Total |
