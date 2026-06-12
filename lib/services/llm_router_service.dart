@@ -19,6 +19,7 @@ class LlmResponse {
     this.completionTokens = 0,
     this.totalTokens = 0,
     this.isTokenUsageEstimated = true,
+    this.notice,
     this.corrections = const [],
   });
 
@@ -29,6 +30,7 @@ class LlmResponse {
   final int completionTokens;
   final int totalTokens;
   final bool isTokenUsageEstimated;
+  final String? notice;
   final List<GrammarCorrection> corrections;
 }
 
@@ -57,6 +59,9 @@ class LlmRouterService {
 
   final Dio _dio;
   final Map<String, DateTime> _cooldowns = {};
+  String? _groqModelsKeyFingerprint;
+  Set<String>? _groqModels;
+  DateTime? _groqModelsFetchedAt;
   static const _connectTimeout = Duration(seconds: 8);
   static const _sendTimeout = Duration(seconds: 10);
   static const _defaultRequestTimeout = Duration(seconds: 18);
@@ -71,7 +76,6 @@ class LlmRouterService {
     int maxOutputTokens = 300,
     int maxHistoryMessages = 6,
     List<String>? allowedProviderIds,
-    bool preferLowLatency = false,
     Duration requestTimeout = _defaultRequestTimeout,
   }) async {
     if (!settings.hasAnyLlmKey) {
@@ -98,7 +102,12 @@ class LlmRouterService {
     ];
 
     final providers = [
-      ..._groqProviders(settings, preferLowLatency: preferLowLatency),
+      ...await _groqProviders(
+        settings,
+        discoveryTimeout: requestTimeout > const Duration(seconds: 2)
+            ? const Duration(seconds: 2)
+            : requestTimeout,
+      ),
       _ProviderConfig(
         id: 'cerebras',
         apiKey: settings.cerebrasApiKey,
@@ -141,9 +150,14 @@ class LlmRouterService {
       settings.preferredProvider,
     );
     final failures = <String>[];
+    final blockedProviderIds = <String>{};
 
     for (final provider in orderedProviders) {
-      if (!provider.isReady || _isCoolingDown(provider.cooldownKey)) continue;
+      if (!provider.isReady ||
+          blockedProviderIds.contains(provider.id) ||
+          _isCoolingDown(provider.cooldownKey)) {
+        continue;
+      }
       try {
         final result = provider.isGemini
             ? await _sendGemini(
@@ -175,6 +189,9 @@ class LlmRouterService {
         );
       } on DioException catch (error) {
         failures.add(_failureText(provider, error));
+        if (_isProviderWideFailure(error)) {
+          blockedProviderIds.add(provider.id);
+        }
         if (_shouldCooldown(error)) {
           _cooldowns[provider.cooldownKey] =
               DateTime.now().add(const Duration(seconds: 60));
@@ -198,6 +215,9 @@ class LlmRouterService {
           '${demo.text} I could not reach the configured AI providers quickly$reason, so this is a local practice reply.',
       provider: 'fallback',
       model: 'local',
+      notice: failures.isEmpty
+          ? 'No configured AI provider was available.'
+          : failures.first,
       corrections: demo.corrections,
     );
   }
@@ -213,7 +233,7 @@ class LlmRouterService {
             id: 'groq',
             apiKey: apiKey,
             baseUrl: 'https://api.groq.com/openai/v1',
-            model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+            model: 'llama-3.1-8b-instant',
           ),
         'cerebras' => _ProviderConfig(
             id: 'cerebras',
@@ -474,15 +494,31 @@ class LlmRouterService {
     return [...preferred, ...remaining];
   }
 
-  List<_ProviderConfig> _groqProviders(
+  Future<List<_ProviderConfig>> _groqProviders(
     AppSettings settings, {
-    required bool preferLowLatency,
-  }) {
-    const scout = 'meta-llama/llama-4-scout-17b-16e-instruct';
-    const maverick = 'meta-llama/llama-4-maverick-17b-128e-instruct';
-    final models = settings.isGroqSmartMode && !preferLowLatency
-        ? const [maverick, scout]
-        : const [scout];
+    required Duration discoveryTimeout,
+  }) async {
+    if (!settings.hasGroqKey) return const [];
+
+    const fastModels = [
+      'llama-3.1-8b-instant',
+      'openai/gpt-oss-20b',
+    ];
+    const smartModels = [
+      'openai/gpt-oss-120b',
+      'llama-3.3-70b-versatile',
+      'openai/gpt-oss-20b',
+      'llama-3.1-8b-instant',
+    ];
+    final candidates = settings.isGroqSmartMode ? smartModels : fastModels;
+    final available = await _availableGroqModels(
+      settings.groqApiKey,
+      timeout: discoveryTimeout,
+    );
+    final models = available == null
+        ? candidates
+        : candidates.where(available.contains).toList();
+
     return [
       for (final model in models)
         _ProviderConfig(
@@ -494,6 +530,44 @@ class LlmRouterService {
     ];
   }
 
+  Future<Set<String>?> _availableGroqModels(
+    String apiKey, {
+    required Duration timeout,
+  }) async {
+    final fingerprint = apiKey.hashCode.toString();
+    final cacheIsFresh = _groqModelsKeyFingerprint == fingerprint &&
+        _groqModels != null &&
+        _groqModelsFetchedAt != null &&
+        DateTime.now().difference(_groqModelsFetchedAt!) <
+            const Duration(hours: 6);
+    if (cacheIsFresh) return _groqModels;
+
+    try {
+      final response = await _dio
+          .get<Map<String, dynamic>>(
+            'https://api.groq.com/openai/v1/models',
+            options: Options(
+              receiveTimeout: timeout,
+              headers: {'Authorization': 'Bearer $apiKey'},
+            ),
+          )
+          .timeout(timeout + const Duration(seconds: 1));
+      final data = response.data?['data'];
+      if (data is! List) return null;
+      final models = data
+          .whereType<Map>()
+          .map((item) => item['id']?.toString() ?? '')
+          .where((id) => id.isNotEmpty)
+          .toSet();
+      _groqModelsKeyFingerprint = fingerprint;
+      _groqModels = models;
+      _groqModelsFetchedAt = DateTime.now();
+      return models;
+    } catch (_) {
+      return null;
+    }
+  }
+
   bool _shouldCooldown(DioException error) {
     final status = error.response?.statusCode ?? 0;
     return error.type == DioExceptionType.connectionTimeout ||
@@ -503,6 +577,17 @@ class LlmRouterService {
         status == 401 ||
         status == 403 ||
         status == 404 ||
+        status == 429 ||
+        status >= 500;
+  }
+
+  bool _isProviderWideFailure(DioException error) {
+    final status = error.response?.statusCode ?? 0;
+    return error.type == DioExceptionType.connectionTimeout ||
+        error.type == DioExceptionType.receiveTimeout ||
+        error.type == DioExceptionType.sendTimeout ||
+        error.type == DioExceptionType.connectionError ||
+        status == 401 ||
         status == 429 ||
         status >= 500;
   }
@@ -544,8 +629,8 @@ class _ProviderConfig {
   String get cooldownKey => '$id:$model';
 
   String get label => switch (id) {
-        'groq' when model.contains('maverick') => 'Groq Maverick',
-        'groq' when model.contains('scout') => 'Groq Scout',
+        'groq' when model == 'openai/gpt-oss-120b' => 'Groq Smart',
+        'groq' when model == 'llama-3.1-8b-instant' => 'Groq Fast',
         'groq' => 'Groq',
         'cerebras' => 'Cerebras',
         'sambanova' => 'SambaNova',

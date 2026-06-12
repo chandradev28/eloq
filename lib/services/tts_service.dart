@@ -19,23 +19,33 @@ class TtsService {
   Future<void> speak(String text, {double speed = 1.0}) async {
     _finishSpeaking();
     _speakCompleter = null;
-    await _tts.stop();
+    await _ignoreTimeout(_tts.stop());
     final completer = Completer<void>();
     _speakCompleter = completer;
-    await _tts.awaitSpeakCompletion(true);
-    await _tts.setSpeechRate(
-      normalizeSpeed(
-        speed: speed,
-        range: await _loadSpeechRateRange(),
-      ),
+    await _tts.awaitSpeakCompletion(true).timeout(const Duration(seconds: 2));
+    await _tts
+        .setSpeechRate(
+          normalizeSpeed(
+            speed: speed,
+            range: await _loadSpeechRateRange(),
+          ),
+        )
+        .timeout(const Duration(seconds: 2));
+    final result = await _tts.speak(text).timeout(const Duration(seconds: 3));
+    if (result == 0 || result == false) {
+      _finishSpeaking();
+      throw StateError('The device voice engine could not start playback.');
+    }
+    final maxPlaybackSeconds = (text.length / 8).ceil().clamp(8, 90);
+    await completer.future.timeout(
+      Duration(seconds: maxPlaybackSeconds),
+      onTimeout: _finishSpeaking,
     );
-    await _tts.speak(text);
-    await completer.future;
   }
 
   Future<void> stop() async {
     _finishSpeaking();
-    await _tts.stop();
+    await _ignoreTimeout(_tts.stop());
   }
 
   void _finishSpeaking() {
@@ -52,7 +62,8 @@ class TtsService {
 
     _speechRateRangeFuture = () async {
       try {
-        final range = await _tts.getSpeechRateValidRange;
+        final range = await _tts.getSpeechRateValidRange
+            .timeout(const Duration(seconds: 2));
         _speechRateRange = range;
         return range;
       } catch (_) {
@@ -87,6 +98,14 @@ class TtsService {
   static double _lerp(double start, double end, double t) {
     final amount = t.clamp(0.0, 1.0);
     return start + ((end - start) * amount);
+  }
+
+  Future<void> _ignoreTimeout(Future<dynamic> operation) async {
+    try {
+      await operation.timeout(const Duration(seconds: 2));
+    } catch (_) {
+      // Playback setup must never block the conversation loop indefinitely.
+    }
   }
 }
 

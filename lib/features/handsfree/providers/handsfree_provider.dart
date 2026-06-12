@@ -329,8 +329,7 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
             maxOutputTokens: 110,
             maxHistoryMessages: 2,
             allowedProviderIds: _handsfreeProviderIds(settings),
-            preferLowLatency: true,
-            requestTimeout: const Duration(seconds: 10),
+            requestTimeout: const Duration(seconds: 8),
           );
       final assistantMessage = Message(
         id: _uuid.v4(),
@@ -343,21 +342,10 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
         messages: [...state.messages, assistantMessage],
         isThinking: false,
         showTranscript: true,
+        error: response.notice,
+        clearError: response.notice == null,
       );
-      if (response.provider != 'demo' && response.provider != 'fallback') {
-        await ref.read(usageProvider.notifier).trackChat(
-              provider: response.provider,
-              model: response.model,
-              promptTokens: response.promptTokens,
-              completionTokens: response.completionTokens,
-              totalTokens: response.totalTokens,
-              isEstimated: response.isTokenUsageEstimated,
-            );
-      }
-      await ref.read(progressProvider.notifier).addMessageXp(
-            corrections: response.corrections.length,
-          );
-      await _countSessionOnce();
+      unawaited(_recordCompletedTurn(response));
       state = state.copyWith(isSpeaking: true);
       await ref
           .read(ttsServiceProvider)
@@ -482,7 +470,10 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
 
     final recorder = ref.read(audioRecorderServiceProvider);
     final settings = ref.read(settingsProvider);
-    final path = await recorder.stop() ?? state.currentAudioPath;
+    final path = await recorder
+            .stop()
+            .timeout(const Duration(seconds: 4), onTimeout: () => null) ??
+        state.currentAudioPath;
     _stopVadLoop();
 
     state = state.copyWith(
@@ -502,18 +493,14 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
           .inSeconds
           .clamp(1, 3600);
       if (settings.hasGroqKey) {
-        await ref.read(usageProvider.notifier).trackAudio(
-              provider: 'groq',
-              model: 'whisper-large-v3-turbo',
-              seconds: audioSeconds,
-            );
+        unawaited(_trackAudio(audioSeconds));
       }
 
       final text = settings.hasGroqKey
           ? await ref
               .read(whisperServiceProvider)
               .transcribe(apiKey: settings.groqApiKey, filePath: path)
-              .timeout(const Duration(seconds: 25))
+              .timeout(const Duration(seconds: 16))
           : 'I want to keep practicing speaking English.';
       state = state.copyWith(isTranscribing: false);
 
@@ -691,6 +678,39 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
     await ref
         .read(progressProvider.notifier)
         .completeConversation(minutesPracticed: minutesPracticed);
+  }
+
+  Future<void> _recordCompletedTurn(LlmResponse response) async {
+    try {
+      if (response.provider != 'demo' && response.provider != 'fallback') {
+        await ref.read(usageProvider.notifier).trackChat(
+              provider: response.provider,
+              model: response.model,
+              promptTokens: response.promptTokens,
+              completionTokens: response.completionTokens,
+              totalTokens: response.totalTokens,
+              isEstimated: response.isTokenUsageEstimated,
+            );
+      }
+      await ref.read(progressProvider.notifier).addMessageXp(
+            corrections: response.corrections.length,
+          );
+      await _countSessionOnce();
+    } catch (_) {
+      // Practice playback must not wait for local analytics persistence.
+    }
+  }
+
+  Future<void> _trackAudio(int seconds) async {
+    try {
+      await ref.read(usageProvider.notifier).trackAudio(
+            provider: 'groq',
+            model: 'whisper-large-v3-turbo',
+            seconds: seconds,
+          );
+    } catch (_) {
+      // Usage persistence is best effort and must not delay transcription.
+    }
   }
 
   int _secondsForMinutes(int minutes) => minutes <= 0 ? 0 : minutes * 60;

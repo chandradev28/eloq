@@ -65,8 +65,8 @@ class AppSettings {
   bool get isGroqSmartMode => groqChatMode == 'smart';
 
   String get groqChatModel => switch (groqChatMode) {
-        'smart' => 'meta-llama/llama-4-maverick-17b-128e-instruct',
-        _ => 'meta-llama/llama-4-scout-17b-16e-instruct',
+        'smart' => 'openai/gpt-oss-120b',
+        _ => 'llama-3.1-8b-instant',
       };
 
   String get groqChatModeLabel => switch (groqChatMode) {
@@ -76,9 +76,8 @@ class AppSettings {
 
   String get groqChatModeSummary => switch (groqChatMode) {
         'smart' =>
-          'Maverick gives richer answers and stronger reasoning for deeper practice.',
-        _ =>
-          'Scout keeps normal practice quick and responsive with shorter waits.',
+          'GPT-OSS 120B gives richer answers and stronger reasoning for deeper practice.',
+        _ => 'Llama 3.1 8B Instant keeps daily practice quick and responsive.',
       };
 
   bool get isDeepSeekProMode => deepSeekChatMode == 'pro';

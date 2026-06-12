@@ -7,9 +7,9 @@ class WhisperService {
   WhisperService({Dio? dio})
       : _dio = dio ??
             Dio(BaseOptions(
-              connectTimeout: const Duration(seconds: 8),
-              sendTimeout: const Duration(seconds: 12),
-              receiveTimeout: const Duration(seconds: 20),
+              connectTimeout: const Duration(seconds: 5),
+              sendTimeout: const Duration(seconds: 8),
+              receiveTimeout: const Duration(seconds: 12),
             ));
 
   final Dio _dio;
@@ -33,13 +33,13 @@ class WhisperService {
         .post<Map<String, dynamic>>(
           'https://api.groq.com/openai/v1/audio/transcriptions',
           options: Options(
-            sendTimeout: const Duration(seconds: 12),
-            receiveTimeout: const Duration(seconds: 20),
+            sendTimeout: const Duration(seconds: 8),
+            receiveTimeout: const Duration(seconds: 12),
             headers: {'Authorization': 'Bearer $apiKey'},
           ),
           data: form,
         )
-        .timeout(const Duration(seconds: 24));
+        .timeout(const Duration(seconds: 15));
 
     return response.data?['text']?.toString().trim() ?? '';
   }

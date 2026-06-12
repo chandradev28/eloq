@@ -197,8 +197,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                         _MiniNote(
                           text: settings.isGroqSmartMode
-                              ? 'Uses Llama 4 Maverick, then Scout if needed.'
-                              : 'Uses Llama 4 Scout for faster daily practice.',
+                              ? 'Uses GPT-OSS 120B with current Groq fallbacks.'
+                              : 'Uses Llama 3.1 8B Instant for the lowest delay.',
                         ),
                       ],
                     ),
