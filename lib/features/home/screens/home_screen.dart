@@ -590,13 +590,13 @@ class _HandsfreePracticeCard extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(26),
         onTap: onTap,
         child: Container(
-          height: 280,
-          padding: const EdgeInsets.all(20),
+          height: 240,
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(30),
+            borderRadius: BorderRadius.circular(26),
             gradient: const LinearGradient(
               colors: [
                 Color(0xFF0B0B10),
@@ -613,7 +613,7 @@ class _HandsfreePracticeCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.only(right: 14),
+                  padding: const EdgeInsets.only(right: 10),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -621,7 +621,7 @@ class _HandsfreePracticeCard extends StatelessWidget {
                         alignment: Alignment.centerLeft,
                         child: _SoftChip(text: 'Live Voice'),
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 12),
                       Text(
                         'Talk with\nLive Voice',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -630,9 +630,9 @@ class _HandsfreePracticeCard extends StatelessWidget {
                               height: 1.04,
                             ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 8),
                       Text(
-                        'Choose native audio or standard voice inside one focused speaking session.',
+                        'Native audio or standard voice. Switch anytime.',
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -643,12 +643,12 @@ class _HandsfreePracticeCard extends StatelessWidget {
                         ),
                       ),
                       const Spacer(),
-                      const _SoftChip(text: 'Switch modes inside'),
+                      const _SoftChip(text: 'Choose voice mode'),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 2),
               const _HandsfreeVisualColumn(),
             ],
           ),
@@ -664,10 +664,10 @@ class _HandsfreeVisualColumn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const SizedBox(
-      width: 118,
+      width: 100,
       child: Column(
         children: [
-          SizedBox(height: 8),
+          SizedBox(height: 6),
           Align(
             alignment: Alignment.topCenter,
             child: _HandsfreeOrbPreview(),
@@ -676,11 +676,12 @@ class _HandsfreeVisualColumn extends StatelessWidget {
           Align(
             alignment: Alignment.bottomRight,
             child: CircleAvatar(
-              radius: 20,
+              radius: 18,
               backgroundColor: Colors.white,
               child: Icon(
                 Icons.multitrack_audio_rounded,
                 color: AppColors.accentPurple,
+                size: 21,
               ),
             ),
           ),
@@ -696,8 +697,8 @@ class _HandsfreeOrbPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 88,
-      height: 88,
+      width: 78,
+      height: 78,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: const RadialGradient(
@@ -719,11 +720,11 @@ class _HandsfreeOrbPreview extends StatelessWidget {
       child: Stack(
         children: [
           Positioned(
-            left: 16,
-            top: 26,
+            left: 14,
+            top: 23,
             child: Container(
-              width: 52,
-              height: 18,
+              width: 46,
+              height: 16,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(999),
                 gradient: LinearGradient(
