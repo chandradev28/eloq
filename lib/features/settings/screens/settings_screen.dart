@@ -43,13 +43,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
     final usage = ref.watch(usageProvider);
-    final liveVoiceUnlocked =
-        _gemini.text.trim().isNotEmpty || settings.hasGeminiKey;
-    final selectedVoiceMode =
-        liveVoiceUnlocked ? settings.voiceMode : 'standard';
     if (settings.isLoaded && !_hydrated) {
       _hydrate(settings);
     }
+    final liveVoiceUnlocked =
+        _gemini.text.trim().isNotEmpty || settings.hasGeminiKey;
+    final deepSeekUnlocked = _deepSeek.text.trim().isNotEmpty;
+    final selectedVoiceMode =
+        liveVoiceUnlocked ? settings.voiceMode : 'standard';
+    final practiceSummary = [
+      '${settings.difficultyLabel} level',
+      '${settings.groqChatModeLabel.toLowerCase()} Groq',
+      if (deepSeekUnlocked)
+        settings.isDeepSeekProMode ? 'DeepSeek Pro' : 'DeepSeek Flash',
+      '${settings.dailyGoalMinutes} min goal',
+    ].join(', ');
 
     return Scaffold(
       body: Center(
@@ -120,6 +128,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       status: _validation['deepseek'],
                       validating: _validating.contains('deepseek'),
                       onTest: () => _testKey('deepseek', _deepSeek.text),
+                      onChanged: (value) {
+                        setState(() {});
+                      },
                     ),
                     _KeyField(
                       controller: _xai,
@@ -136,8 +147,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 _SettingsSectionCard(
                   icon: Icons.tune_rounded,
                   title: 'Practice setup',
-                  subtitle:
-                      '${settings.difficultyLabel} level, ${settings.groqChatModeLabel.toLowerCase()} Groq, ${settings.dailyGoalMinutes} min goal',
+                  subtitle: practiceSummary,
                   children: [
                     _PracticeModeCard(
                       title: 'English level',
@@ -184,31 +194,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    _PracticeModeCard(
-                      title: 'DeepSeek response mode',
-                      subtitle: settings.deepSeekChatModeSummary,
-                      children: [
-                        _ChoiceRow(
-                          options: const [
-                            ('flash', 'Flash'),
-                            ('pro', 'Pro'),
-                          ],
-                          selected: settings.deepSeekChatMode,
-                          onChanged: (value) {
-                            ref.read(settingsProvider.notifier).update(
-                                  (current) =>
-                                      current.copyWith(deepSeekChatMode: value),
-                                );
-                          },
-                        ),
-                        _MiniNote(
-                          text: settings.isDeepSeekProMode
-                              ? 'Uses DeepSeek V4 Pro.'
-                              : 'Uses DeepSeek V4 Flash.',
-                        ),
-                      ],
-                    ),
+                    if (deepSeekUnlocked) ...[
+                      const SizedBox(height: 12),
+                      _PracticeModeCard(
+                        title: 'DeepSeek response mode',
+                        subtitle: settings.deepSeekChatModeSummary,
+                        children: [
+                          _ChoiceRow(
+                            options: const [
+                              ('flash', 'Flash'),
+                              ('pro', 'Pro'),
+                            ],
+                            selected: settings.deepSeekChatMode,
+                            onChanged: (value) {
+                              ref.read(settingsProvider.notifier).update(
+                                    (current) => current.copyWith(
+                                      deepSeekChatMode: value,
+                                    ),
+                                  );
+                            },
+                          ),
+                          _MiniNote(
+                            text: settings.isDeepSeekProMode
+                                ? 'Uses DeepSeek V4 Pro.'
+                                : 'Uses DeepSeek V4 Flash.',
+                          ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     _PracticeModeCard(
                       title: 'Voice engine',

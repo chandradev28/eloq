@@ -107,6 +107,7 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
   static const _maxUtterance = Duration(seconds: 10);
   static const _minSpeechLength = Duration(milliseconds: 450);
   static const _noSpeechFallback = Duration(milliseconds: 3500);
+  static const _postTtsMicCooldown = Duration(milliseconds: 1200);
 
   final Ref ref;
   final Uuid _uuid = const Uuid();
@@ -114,6 +115,7 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
   DateTime? _recordingStartedAt;
   DateTime? _speechStartedAt;
   DateTime? _lastVoiceAt;
+  DateTime? _listenBlockedUntil;
   bool _speechDetected = false;
   bool _sessionCounted = false;
   bool _isStoppingUtterance = false;
@@ -280,10 +282,11 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
     await ref
         .read(ttsServiceProvider)
         .speak(last.text, speed: settings.speakingSpeed);
+    _blockMicAfterSpeech();
     state = state.copyWith(isSpeaking: false);
 
     if (state.isSessionActive && !state.timerFinished) {
-      await _beginListeningCycle();
+      await _resumeListeningIfNeeded();
     }
   }
 
@@ -350,9 +353,10 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
       await ref
           .read(ttsServiceProvider)
           .speak(response.text, speed: settings.speakingSpeed);
+      _blockMicAfterSpeech();
       state = state.copyWith(isSpeaking: false);
       if (state.isSessionActive && !state.timerFinished) {
-        await _beginListeningCycle();
+        await _resumeListeningIfNeeded();
       }
     } catch (error) {
       state = state.copyWith(
@@ -381,6 +385,17 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
         state.isSpeaking) {
       return;
     }
+
+    await _waitForMicCooldown();
+    if (!state.isSessionActive ||
+        state.timerFinished ||
+        state.isRecording ||
+        state.isTranscribing ||
+        state.isThinking ||
+        state.isSpeaking) {
+      return;
+    }
+    await ref.read(ttsServiceProvider).stop();
 
     final recorder = ref.read(audioRecorderServiceProvider);
     final hasPermission = await recorder.hasPermission();
@@ -448,9 +463,14 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
         _speechStartedAt != null &&
         now.difference(_speechStartedAt!) >= _minSpeechLength;
 
-    if (hasNaturalPause || hasTimedOut || hasFallbackWindow) {
+    if (hasFallbackWindow || (hasTimedOut && !_speechDetected)) {
+      unawaited(_restartListeningAfterSilence());
+      return;
+    }
+
+    if (hasNaturalPause || (hasTimedOut && _speechDetected)) {
       unawaited(_finalizeCurrentUtterance(
-        triggeredByFallback: hasFallbackWindow && !_speechDetected,
+        triggeredByFallback: false,
       ));
     }
   }
@@ -504,7 +524,8 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
           : 'I want to keep practicing speaking English.';
       state = state.copyWith(isTranscribing: false);
 
-      if (text.trim().length < 2) {
+      final trimmedText = text.trim();
+      if (trimmedText.length < 2) {
         state = state.copyWith(
           showTranscript: true,
           error: triggeredByFallback
@@ -515,7 +536,16 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
         return;
       }
 
-      await sendText(text);
+      if (_looksLikeAssistantEcho(trimmedText)) {
+        state = state.copyWith(
+          isTranscribing: false,
+          clearError: true,
+        );
+        await _resumeListeningIfNeeded();
+        return;
+      }
+
+      await sendText(trimmedText);
     } catch (error) {
       state = state.copyWith(
         isTranscribing: false,
@@ -576,6 +606,88 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
       isRecording: false,
       clearAudioPath: true,
     );
+  }
+
+  Future<void> _restartListeningAfterSilence() async {
+    if (_isStoppingUtterance || !state.isRecording) return;
+    _isStoppingUtterance = true;
+    _stopVadLoop();
+
+    try {
+      final recorder = ref.read(audioRecorderServiceProvider);
+      if (await recorder.isRecording()) {
+        await recorder.cancel();
+      }
+      state = state.copyWith(
+        isRecording: false,
+        clearAudioPath: true,
+        clearError: true,
+      );
+    } catch (_) {
+      state = state.copyWith(
+        isRecording: false,
+        clearAudioPath: true,
+      );
+    } finally {
+      _recordingStartedAt = null;
+      _speechStartedAt = null;
+      _lastVoiceAt = null;
+      _speechDetected = false;
+      _isStoppingUtterance = false;
+    }
+
+    await _resumeListeningIfNeeded();
+  }
+
+  void _blockMicAfterSpeech() {
+    _listenBlockedUntil = DateTime.now().add(_postTtsMicCooldown);
+  }
+
+  Future<void> _waitForMicCooldown() async {
+    final blockedUntil = _listenBlockedUntil;
+    if (blockedUntil == null) return;
+    final remaining = blockedUntil.difference(DateTime.now());
+    if (!remaining.isNegative) {
+      await Future<void>.delayed(remaining);
+    }
+    if (_listenBlockedUntil == blockedUntil) {
+      _listenBlockedUntil = null;
+    }
+  }
+
+  bool _looksLikeAssistantEcho(String transcript) {
+    final lastAssistant =
+        state.messages.where((item) => !item.isUser).lastOrNull;
+    if (lastAssistant == null) return false;
+
+    final heard = _normalizeForEchoCheck(transcript);
+    final spoken = _normalizeForEchoCheck(lastAssistant.text);
+    if (heard.length < 18 || spoken.length < 18) return false;
+    if (heard == spoken) return true;
+
+    final shorter = heard.length < spoken.length ? heard : spoken;
+    final longer = heard.length < spoken.length ? spoken : heard;
+    if (longer.contains(shorter) && shorter.length / longer.length > 0.42) {
+      return true;
+    }
+
+    final heardWords =
+        heard.split(' ').where((word) => word.length > 2).toSet();
+    final spokenWords =
+        spoken.split(' ').where((word) => word.length > 2).toSet();
+    if (heardWords.length < 4 || spokenWords.length < 4) return false;
+
+    final overlap = heardWords.intersection(spokenWords).length;
+    final coverage = overlap / heardWords.length;
+    return coverage >= 0.78 && heardWords.length <= spokenWords.length + 4;
+  }
+
+  String _normalizeForEchoCheck(String value) {
+    return value
+        .toLowerCase()
+        .replaceAll(RegExp(r"[^a-z0-9\s']"), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
   }
 
   void _startVadLoop() {
