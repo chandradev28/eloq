@@ -26,10 +26,13 @@ class HandsfreeScreen extends ConsumerStatefulWidget {
 class _HandsfreeScreenState extends ConsumerState<HandsfreeScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _pulse;
+  late final ScrollController _transcriptScrollController;
+  int _lastTranscriptVersion = 0;
 
   @override
   void initState() {
     super.initState();
+    _transcriptScrollController = ScrollController();
     _pulse = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1800),
@@ -44,6 +47,7 @@ class _HandsfreeScreenState extends ConsumerState<HandsfreeScreen>
 
   @override
   void dispose() {
+    _transcriptScrollController.dispose();
     _pulse.dispose();
     super.dispose();
   }
@@ -55,6 +59,7 @@ class _HandsfreeScreenState extends ConsumerState<HandsfreeScreen>
     final topic = Topics.byId(state.topicId);
     final lastUserMessage =
         state.messages.where((item) => item.isUser).lastOrNull;
+    _scheduleTranscriptScroll(state);
     final idleLabel = state.timerFinished
         ? 'Session complete'
         : state.isSpeaking
@@ -79,7 +84,7 @@ class _HandsfreeScreenState extends ConsumerState<HandsfreeScreen>
               children: [
                 _HandsfreeTopBar(
                   title: 'Voice Practice',
-                  onBack: () => context.pop(),
+                  onBack: () => _closeVoicePractice(controller),
                   onOptions: () =>
                       _openSessionSetup(context, controller, state),
                 ),
@@ -124,6 +129,7 @@ class _HandsfreeScreenState extends ConsumerState<HandsfreeScreen>
                             key: const ValueKey('transcript-stage'),
                             state: state,
                             lastUserMessage: lastUserMessage?.text,
+                            scrollController: _transcriptScrollController,
                             pulse: _pulse,
                             onOrbTap: controller.toggleTranscript,
                           )
@@ -195,7 +201,7 @@ class _HandsfreeScreenState extends ConsumerState<HandsfreeScreen>
                       _CircleActionButton(
                         icon: Icons.close_rounded,
                         tooltip: 'Close',
-                        onTap: () => context.pop(),
+                        onTap: () => _closeVoicePractice(controller),
                       ),
                     ],
                   ),
@@ -206,6 +212,39 @@ class _HandsfreeScreenState extends ConsumerState<HandsfreeScreen>
         ),
       ),
     );
+  }
+
+  Future<void> _closeVoicePractice(HandsfreeController controller) async {
+    await controller.endSession();
+    if (!mounted) return;
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/home');
+    }
+  }
+
+  void _scheduleTranscriptScroll(HandsfreeState state) {
+    final version = Object.hash(
+      state.showTranscript,
+      state.messages.length,
+      state.isThinking,
+      state.isTranscribing,
+      state.isSpeaking,
+      state.error,
+    );
+    if (!state.showTranscript || version == _lastTranscriptVersion) return;
+    _lastTranscriptVersion = version;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_transcriptScrollController.hasClients) return;
+      final position = _transcriptScrollController.position;
+      _transcriptScrollController.animateTo(
+        position.maxScrollExtent,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+      );
+    });
   }
 
   Future<void> _openSessionSetup(
@@ -484,12 +523,14 @@ class _TranscriptStage extends StatelessWidget {
     super.key,
     required this.state,
     required this.lastUserMessage,
+    required this.scrollController,
     required this.pulse,
     required this.onOrbTap,
   });
 
   final HandsfreeState state;
   final String? lastUserMessage;
+  final ScrollController scrollController;
   final Animation<double> pulse;
   final VoidCallback onOrbTap;
 
@@ -498,7 +539,8 @@ class _TranscriptStage extends StatelessWidget {
     return Stack(
       children: [
         ListView(
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 198),
+          controller: scrollController,
+          padding: const EdgeInsets.fromLTRB(18, 22, 18, 224),
           children: [
             if (lastUserMessage != null)
               Align(

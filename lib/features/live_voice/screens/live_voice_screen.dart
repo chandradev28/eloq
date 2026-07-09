@@ -75,7 +75,7 @@ class _LiveVoiceScreenState extends ConsumerState<LiveVoiceScreen>
             child: Column(
               children: [
                 _LiveTopBar(
-                  onBack: () => context.pop(),
+                  onBack: () => _closeLiveVoice(controller),
                   onOptions: () => _openLiveSetup(context, controller, state),
                 ),
                 Padding(
@@ -178,6 +178,16 @@ class _LiveVoiceScreenState extends ConsumerState<LiveVoiceScreen>
         ),
       ),
     );
+  }
+
+  Future<void> _closeLiveVoice(LiveVoiceController controller) async {
+    await controller.endSession();
+    if (!mounted) return;
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/home');
+    }
   }
 
   Future<void> _openLiveSetup(

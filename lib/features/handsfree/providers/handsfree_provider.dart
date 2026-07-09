@@ -251,6 +251,10 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
     await startHandsfreeSession();
   }
 
+  Future<void> endSession() async {
+    await _stopHandsfreeSession();
+  }
+
   Future<void> submitCurrentTurn() async {
     if (!state.isRecording) return;
     await _finalizeCurrentUtterance(triggeredByFallback: false);
@@ -318,6 +322,9 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
 
     final settings = ref.read(settingsProvider);
     final topic = Topics.byId(state.topicId);
+    final speedInstruction = settings.isGroqSmartMode
+        ? 'Groq Maverick mode: give a complete but concise spoken answer in 1-3 short sentences, then ask one short follow-up question.'
+        : 'Groq Scout mode: reply in 1-2 short spoken sentences under 35 words, then ask one short follow-up question. Keep any correction JSON brief.';
     try {
       final response = await ref.read(llmRouterServiceProvider).sendMessage(
             settings: settings,
@@ -325,11 +332,11 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
             history: previousMessages,
             userText: text,
             extraInstructions: [
-              'Handsfree voice mode needs speed. Reply with one short natural sentence, then ask one short follow-up question.',
+              speedInstruction,
               state.customPrompt.trim(),
             ].where((item) => item.isNotEmpty).join('\n'),
             learnerContext: state.resumeContext,
-            maxOutputTokens: 110,
+            maxOutputTokens: settings.isGroqSmartMode ? 150 : 120,
             maxHistoryMessages: 2,
             allowedProviderIds: _handsfreeProviderIds(settings),
             requestTimeout: const Duration(seconds: 8),

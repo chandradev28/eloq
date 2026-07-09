@@ -59,9 +59,6 @@ class LlmRouterService {
 
   final Dio _dio;
   final Map<String, DateTime> _cooldowns = {};
-  String? _groqModelsKeyFingerprint;
-  Set<String>? _groqModels;
-  DateTime? _groqModelsFetchedAt;
   static const _connectTimeout = Duration(seconds: 8);
   static const _sendTimeout = Duration(seconds: 10);
   static const _defaultRequestTimeout = Duration(seconds: 18);
@@ -102,12 +99,7 @@ class LlmRouterService {
     ];
 
     final providers = [
-      ...await _groqProviders(
-        settings,
-        discoveryTimeout: requestTimeout > const Duration(seconds: 2)
-            ? const Duration(seconds: 2)
-            : requestTimeout,
-      ),
+      ..._groqProviders(settings),
       _ProviderConfig(
         id: 'gemini',
         apiKey: settings.geminiApiKey,
@@ -221,7 +213,7 @@ class LlmRouterService {
             id: 'groq',
             apiKey: apiKey,
             baseUrl: 'https://api.groq.com/openai/v1',
-            model: 'llama-3.1-8b-instant',
+            model: 'meta-llama/llama-4-scout-17b-16e-instruct',
           ),
         'gemini' => _ProviderConfig(
             id: 'gemini',
@@ -295,7 +287,8 @@ class LlmRouterService {
         'model': provider.model,
         'messages': messages,
         'temperature': 0.7,
-        'max_tokens': maxOutputTokens,
+        'max_completion_tokens': maxOutputTokens,
+        ..._groqReasoningOptions(provider.model),
         'stream': false,
       },
     ).timeout(requestTimeout + const Duration(seconds: 2));
@@ -460,6 +453,14 @@ class LlmRouterService {
     };
   }
 
+  Map<String, Object> _groqReasoningOptions(String model) {
+    if (!model.startsWith('openai/gpt-oss-')) return const {};
+    return {
+      'reasoning_effort': model == 'openai/gpt-oss-20b' ? 'low' : 'medium',
+      'include_reasoning': false,
+    };
+  }
+
   List<_ProviderConfig> _orderProviders(
     List<_ProviderConfig> providers,
     String preferredProvider,
@@ -470,33 +471,22 @@ class LlmRouterService {
     return [...preferred, ...remaining];
   }
 
-  Future<List<_ProviderConfig>> _groqProviders(
-    AppSettings settings, {
-    required Duration discoveryTimeout,
-  }) async {
+  List<_ProviderConfig> _groqProviders(AppSettings settings) {
     if (!settings.hasGroqKey) return const [];
 
     const fastModels = [
+      'meta-llama/llama-4-scout-17b-16e-instruct',
       'llama-3.1-8b-instant',
-      'openai/gpt-oss-20b',
     ];
     const smartModels = [
-      'openai/gpt-oss-120b',
+      'meta-llama/llama-4-maverick-17b-128e-instruct',
+      'meta-llama/llama-4-scout-17b-16e-instruct',
       'llama-3.3-70b-versatile',
-      'openai/gpt-oss-20b',
       'llama-3.1-8b-instant',
     ];
-    final candidates = settings.isGroqSmartMode ? smartModels : fastModels;
-    final available = await _availableGroqModels(
-      settings.groqApiKey,
-      timeout: discoveryTimeout,
-    );
-    final models = available == null
-        ? candidates
-        : candidates.where(available.contains).toList();
 
     return [
-      for (final model in models)
+      for (final model in settings.isGroqSmartMode ? smartModels : fastModels)
         _ProviderConfig(
           id: 'groq',
           apiKey: settings.groqApiKey,
@@ -504,44 +494,6 @@ class LlmRouterService {
           model: model,
         ),
     ];
-  }
-
-  Future<Set<String>?> _availableGroqModels(
-    String apiKey, {
-    required Duration timeout,
-  }) async {
-    final fingerprint = apiKey.hashCode.toString();
-    final cacheIsFresh = _groqModelsKeyFingerprint == fingerprint &&
-        _groqModels != null &&
-        _groqModelsFetchedAt != null &&
-        DateTime.now().difference(_groqModelsFetchedAt!) <
-            const Duration(hours: 6);
-    if (cacheIsFresh) return _groqModels;
-
-    try {
-      final response = await _dio
-          .get<Map<String, dynamic>>(
-            'https://api.groq.com/openai/v1/models',
-            options: Options(
-              receiveTimeout: timeout,
-              headers: {'Authorization': 'Bearer $apiKey'},
-            ),
-          )
-          .timeout(timeout + const Duration(seconds: 1));
-      final data = response.data?['data'];
-      if (data is! List) return null;
-      final models = data
-          .whereType<Map>()
-          .map((item) => item['id']?.toString() ?? '')
-          .where((id) => id.isNotEmpty)
-          .toSet();
-      _groqModelsKeyFingerprint = fingerprint;
-      _groqModels = models;
-      _groqModelsFetchedAt = DateTime.now();
-      return models;
-    } catch (_) {
-      return null;
-    }
   }
 
   bool _shouldCooldown(DioException error) {
@@ -605,7 +557,10 @@ class _ProviderConfig {
   String get cooldownKey => '$id:$model';
 
   String get label => switch (id) {
-        'groq' when model == 'openai/gpt-oss-120b' => 'Groq Smart',
+        'groq' when model == 'meta-llama/llama-4-maverick-17b-128e-instruct' =>
+          'Groq Maverick',
+        'groq' when model == 'meta-llama/llama-4-scout-17b-16e-instruct' =>
+          'Groq Scout',
         'groq' when model == 'llama-3.1-8b-instant' => 'Groq Fast',
         'groq' => 'Groq',
         'gemini' => 'Gemini',

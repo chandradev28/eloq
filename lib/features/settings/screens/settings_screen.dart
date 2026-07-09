@@ -189,8 +189,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                         _MiniNote(
                           text: settings.isGroqSmartMode
-                              ? 'Uses GPT-OSS 120B with current Groq fallbacks.'
-                              : 'Uses Llama 3.1 8B Instant for the lowest delay.',
+                              ? 'Uses Llama 4 Maverick first, then current Groq fallbacks.'
+                              : 'Uses Llama 4 Scout first for quick voice replies.',
                         ),
                       ],
                     ),
