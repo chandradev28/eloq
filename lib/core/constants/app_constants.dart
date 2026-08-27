@@ -10,15 +10,15 @@ class AppConstants {
 
   static const levels = [
     LevelDefinition('Beginner', 0),
-    LevelDefinition('Tourist', 200),
-    LevelDefinition('Explorer', 500),
-    LevelDefinition('Conversationalist', 1000),
-    LevelDefinition('Communicator', 2000),
-    LevelDefinition('Storyteller', 4000),
-    LevelDefinition('Debater', 7000),
-    LevelDefinition('Articulate', 11000),
+    LevelDefinition('Building', 200),
+    LevelDefinition('Active', 500),
+    LevelDefinition('Consistent', 1000),
+    LevelDefinition('Committed', 2000),
+    LevelDefinition('Focused', 4000),
+    LevelDefinition('Fluent', 7000),
+    LevelDefinition('Advanced', 11000),
     LevelDefinition('Eloquent', 16000),
-    LevelDefinition('Native Speaker', 25000),
+    LevelDefinition('Mastery', 25000),
   ];
 }
 

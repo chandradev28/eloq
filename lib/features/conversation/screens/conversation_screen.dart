@@ -61,8 +61,8 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
               children: [
                 _AssistantTopBar(
                   title: topic.name,
-                  onBack: () => context.pop(),
-                  onHistory: () => context.go('/history'),
+                  onBack: () => _closeConversation(controller),
+                  onHistory: () => _openHistory(controller),
                   onNewSession: controller.startNewSession,
                 ),
                 Padding(
@@ -70,6 +70,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                   child: _AssistantPanel(
                     isRecording: state.isRecording,
                     isTranscribing: state.isTranscribing,
+                    isSpeaking: state.isSpeaking,
                     onMic: controller.toggleRecording,
                   ),
                 ),
@@ -107,6 +108,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                       Expanded(
                         child: TextField(
                           controller: _textController,
+                          enabled: !state.isThinking && !state.isTranscribing,
                           minLines: 1,
                           maxLines: 3,
                           decoration: const InputDecoration(
@@ -123,7 +125,9 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                           foregroundColor: Colors.white,
                           fixedSize: const Size(50, 50),
                         ),
-                        onPressed: () => _sendText(controller),
+                        onPressed: state.isThinking || state.isTranscribing
+                            ? null
+                            : () => _sendText(controller),
                         icon: const Icon(Icons.near_me_rounded),
                       ),
                     ],
@@ -141,6 +145,21 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     final text = _textController.text;
     _textController.clear();
     controller.sendText(text);
+  }
+
+  Future<void> _closeConversation(ConversationController controller) async {
+    await controller.endSession();
+    if (!mounted) return;
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/home');
+    }
+  }
+
+  Future<void> _openHistory(ConversationController controller) async {
+    await controller.endSession();
+    if (mounted) context.go('/history');
   }
 }
 
@@ -204,11 +223,13 @@ class _AssistantPanel extends StatelessWidget {
   const _AssistantPanel({
     required this.isRecording,
     required this.isTranscribing,
+    required this.isSpeaking,
     required this.onMic,
   });
 
   final bool isRecording;
   final bool isTranscribing;
+  final bool isSpeaking;
   final VoidCallback onMic;
 
   @override
@@ -257,7 +278,9 @@ class _AssistantPanel extends StatelessWidget {
                       ? 'Listening'
                       : isTranscribing
                           ? 'Transcribing'
-                          : 'Ready to practice',
+                          : isSpeaking
+                              ? 'Speaking'
+                              : 'Ready to practice',
                 ),
                 const SizedBox(height: 16),
                 Container(

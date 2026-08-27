@@ -22,21 +22,21 @@ class TtsService {
     await _ignoreTimeout(_tts.stop());
     final completer = Completer<void>();
     _speakCompleter = completer;
-    await _tts.awaitSpeakCompletion(true).timeout(const Duration(seconds: 2));
-    await _tts
-        .setSpeechRate(
-          normalizeSpeed(
-            speed: speed,
-            range: await _loadSpeechRateRange(),
-          ),
-        )
-        .timeout(const Duration(seconds: 2));
+    await _ignoreTimeout(_tts.awaitSpeakCompletion(true));
+    await _ignoreTimeout(
+      _tts.setSpeechRate(
+        normalizeSpeed(
+          speed: speed,
+          range: await _loadSpeechRateRange(),
+        ),
+      ),
+    );
     final result = await _tts.speak(text).timeout(const Duration(seconds: 3));
     if (result == 0 || result == false) {
       _finishSpeaking();
       throw StateError('The device voice engine could not start playback.');
     }
-    final maxPlaybackSeconds = (text.length / 8).ceil().clamp(8, 90);
+    final maxPlaybackSeconds = playbackTimeoutSeconds(text, speed: speed);
     await completer.future.timeout(
       Duration(seconds: maxPlaybackSeconds),
       onTimeout: _finishSpeaking,
@@ -98,6 +98,17 @@ class TtsService {
   static double _lerp(double start, double end, double t) {
     final amount = t.clamp(0.0, 1.0);
     return start + ((end - start) * amount);
+  }
+
+  @visibleForTesting
+  static int playbackTimeoutSeconds(String text, {required double speed}) {
+    final words = text
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((word) => word.isNotEmpty)
+        .length;
+    final wordsPerSecond = 2.4 * speed.clamp(0.5, 2.0);
+    return ((words / wordsPerSecond).ceil() + 8).clamp(12, 180);
   }
 
   Future<void> _ignoreTimeout(Future<dynamic> operation) async {

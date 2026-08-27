@@ -5,6 +5,7 @@ import 'package:record/record.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/constants/topics.dart';
+import '../../../core/utils/app_error_message.dart';
 import '../../../features/conversation/models/message.dart';
 import '../../../features/settings/providers/settings_provider.dart';
 import '../../../models/conversation_session.dart';
@@ -120,6 +121,8 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
   bool _sessionCounted = false;
   bool _isStoppingUtterance = false;
   bool _isPollingAmplitude = false;
+  bool _disposed = false;
+  int _runtimeGeneration = 0;
   Timer? _timer;
   Timer? _vadTimer;
 
@@ -268,6 +271,13 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
       return;
     }
     if (state.isSessionActive) return;
+    if (!ref.read(settingsProvider).hasGroqKey) {
+      state = state.copyWith(
+        error:
+            'Add your Groq API key in Settings to use standard voice transcription.',
+      );
+      return;
+    }
 
     state = state.copyWith(
       isSessionActive: true,
@@ -297,6 +307,7 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
   Future<void> sendText(String rawText) async {
     final text = rawText.trim();
     if (text.isEmpty) return;
+    final generation = _runtimeGeneration;
     if (state.timerFinished) {
       state = state.copyWith(
         error: 'Timer finished. Start a new voice session to keep practicing.',
@@ -305,6 +316,7 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
     }
 
     await _stopCurrentRecording(discardRecording: true);
+    if (!_isCurrent(generation)) return;
     _ensureTimerRunning();
     final previousMessages = state.messages;
     final userMessage = Message(
@@ -323,8 +335,8 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
     final settings = ref.read(settingsProvider);
     final topic = Topics.byId(state.topicId);
     final speedInstruction = settings.isGroqSmartMode
-        ? 'Groq Maverick mode: give a complete but concise spoken answer in 1-3 short sentences, then ask one short follow-up question.'
-        : 'Groq Scout mode: reply in 1-2 short spoken sentences under 35 words, then ask one short follow-up question. Keep any correction JSON brief.';
+        ? 'Groq Smart mode: give a complete but concise spoken answer in 1-3 short sentences, then ask one short follow-up question.'
+        : 'Groq Fast mode: reply in 1-2 short spoken sentences under 35 words, then ask one short follow-up question. Keep any correction JSON brief.';
     try {
       final response = await ref.read(llmRouterServiceProvider).sendMessage(
             settings: settings,
@@ -341,6 +353,7 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
             allowedProviderIds: _handsfreeProviderIds(settings),
             requestTimeout: const Duration(seconds: 8),
           );
+      if (!_isCurrent(generation)) return;
       final assistantMessage = Message(
         id: _uuid.v4(),
         role: MessageRole.assistant,
@@ -360,16 +373,18 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
       await ref
           .read(ttsServiceProvider)
           .speak(response.text, speed: settings.speakingSpeed);
+      if (!_isCurrent(generation)) return;
       _blockMicAfterSpeech();
       state = state.copyWith(isSpeaking: false);
       if (state.isSessionActive && !state.timerFinished) {
         await _resumeListeningIfNeeded();
       }
     } catch (error) {
+      if (!_isCurrent(generation)) return;
       state = state.copyWith(
         isThinking: false,
         isSpeaking: false,
-        error: error.toString(),
+        error: AppErrorMessage.from(error),
       );
       await _resumeListeningIfNeeded();
     }
@@ -493,7 +508,9 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
     required bool triggeredByFallback,
   }) async {
     if (_isStoppingUtterance || !state.isRecording) return;
+    final generation = _runtimeGeneration;
     _isStoppingUtterance = true;
+    var ownsUtteranceState = true;
 
     final recorder = ref.read(audioRecorderServiceProvider);
     final settings = ref.read(settingsProvider);
@@ -502,6 +519,7 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
             .timeout(const Duration(seconds: 4), onTimeout: () => null) ??
         state.currentAudioPath;
     _stopVadLoop();
+    if (!_isCurrent(generation)) return;
 
     state = state.copyWith(
       isRecording: false,
@@ -523,12 +541,16 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
         unawaited(_trackAudio(audioSeconds));
       }
 
-      final text = settings.hasGroqKey
-          ? await ref
-              .read(whisperServiceProvider)
-              .transcribe(apiKey: settings.groqApiKey, filePath: path)
-              .timeout(const Duration(seconds: 16))
-          : 'I want to keep practicing speaking English.';
+      if (!settings.hasGroqKey) {
+        throw StateError(
+          'Add your Groq API key in Settings to transcribe your voice.',
+        );
+      }
+      final text = await ref
+          .read(whisperServiceProvider)
+          .transcribe(apiKey: settings.groqApiKey, filePath: path)
+          .timeout(const Duration(seconds: 16));
+      if (!_isCurrent(generation)) return;
       state = state.copyWith(isTranscribing: false);
 
       final trimmedText = text.trim();
@@ -552,24 +574,28 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
         return;
       }
 
+      _clearUtteranceTracking();
+      _isStoppingUtterance = false;
+      ownsUtteranceState = false;
       await sendText(trimmedText);
     } catch (error) {
+      if (!_isCurrent(generation)) return;
       state = state.copyWith(
         isTranscribing: false,
         showTranscript: true,
-        error: error.toString(),
+        error: AppErrorMessage.from(error),
       );
       await _resumeListeningIfNeeded();
     } finally {
-      _recordingStartedAt = null;
-      _speechStartedAt = null;
-      _lastVoiceAt = null;
-      _speechDetected = false;
-      _isStoppingUtterance = false;
+      if (ownsUtteranceState && _isCurrent(generation)) {
+        _clearUtteranceTracking();
+        _isStoppingUtterance = false;
+      }
     }
   }
 
   Future<void> _stopHandsfreeSession({bool resetGreeting = false}) async {
+    _runtimeGeneration++;
     await _stopAudioWork(discardRecording: true);
     _timer?.cancel();
     state = state.copyWith(
@@ -711,8 +737,10 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
 
   Future<void> _resumeListeningIfNeeded() async {
     if (!state.isSessionActive || state.timerFinished) return;
+    final generation = _runtimeGeneration;
     await Future<void>.delayed(const Duration(milliseconds: 250));
-    if (!state.isSessionActive ||
+    if (!_isCurrent(generation) ||
+        !state.isSessionActive ||
         state.timerFinished ||
         state.isRecording ||
         state.isTranscribing ||
@@ -801,16 +829,17 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
 
   Future<void> _recordCompletedTurn(LlmResponse response) async {
     try {
-      if (response.provider != 'demo' && response.provider != 'fallback') {
-        await ref.read(usageProvider.notifier).trackChat(
-              provider: response.provider,
-              model: response.model,
-              promptTokens: response.promptTokens,
-              completionTokens: response.completionTokens,
-              totalTokens: response.totalTokens,
-              isEstimated: response.isTokenUsageEstimated,
-            );
+      if (response.provider == 'demo' || response.provider == 'fallback') {
+        return;
       }
+      await ref.read(usageProvider.notifier).trackChat(
+            provider: response.provider,
+            model: response.model,
+            promptTokens: response.promptTokens,
+            completionTokens: response.completionTokens,
+            totalTokens: response.totalTokens,
+            isEstimated: response.isTokenUsageEstimated,
+          );
       await ref.read(progressProvider.notifier).addMessageXp(
             corrections: response.corrections.length,
           );
@@ -834,21 +863,40 @@ class HandsfreeController extends StateNotifier<HandsfreeState> {
 
   int _secondsForMinutes(int minutes) => minutes <= 0 ? 0 : minutes * 60;
 
+  bool _isCurrent(int generation) {
+    return !_disposed && generation == _runtimeGeneration;
+  }
+
+  void _clearUtteranceTracking() {
+    _recordingStartedAt = null;
+    _speechStartedAt = null;
+    _lastVoiceAt = null;
+    _speechDetected = false;
+  }
+
   List<String>? _handsfreeProviderIds(AppSettings settings) {
-    if (settings.preferredProvider != 'auto') {
-      return [settings.preferredProvider];
-    }
-    if (settings.hasGroqKey) return const ['groq'];
-    if (settings.hasGeminiKey) return const ['gemini'];
-    if (settings.hasDeepSeekKey) return const ['deepseek'];
-    return null;
+    final providers = <String>[
+      if (settings.hasGroqKey) 'groq',
+      if (settings.hasGeminiKey) 'gemini',
+      if (settings.openRouterApiKey.trim().isNotEmpty) 'openrouter',
+      if (settings.hasDeepSeekKey) 'deepseek',
+    ];
+    return providers.isEmpty ? null : providers;
   }
 
   @override
   void dispose() {
+    _disposed = true;
+    _runtimeGeneration++;
     _timer?.cancel();
     _stopVadLoop();
-    unawaited(_stopAudioWork(discardRecording: true));
+    final recorder = ref.read(audioRecorderServiceProvider);
+    unawaited(() async {
+      if (await recorder.isRecording()) {
+        await recorder.cancel();
+      }
+      await ref.read(ttsServiceProvider).stop();
+    }());
     super.dispose();
   }
 }

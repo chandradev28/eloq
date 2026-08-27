@@ -21,6 +21,14 @@ class AudioRecorderService {
         sampleRate: 16000,
         numChannels: 1,
         bitRate: 128000,
+        autoGain: true,
+        echoCancel: true,
+        noiseSuppress: true,
+        androidConfig: AndroidRecordConfig(
+          audioSource: AndroidAudioSource.voiceCommunication,
+          speakerphone: true,
+          audioManagerMode: AudioManagerMode.modeInCommunication,
+        ),
       ),
       path: path,
     );
@@ -38,6 +46,15 @@ class AudioRecorderService {
         sampleRate: 16000,
         numChannels: 1,
         bitRate: 256000,
+        autoGain: true,
+        echoCancel: true,
+        noiseSuppress: true,
+        streamBufferSize: 1280,
+        androidConfig: AndroidRecordConfig(
+          audioSource: AndroidAudioSource.voiceCommunication,
+          speakerphone: true,
+          audioManagerMode: AudioManagerMode.modeInCommunication,
+        ),
       ),
     );
   }

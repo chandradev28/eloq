@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -45,6 +45,12 @@ class GeminiLiveOutputTranscript extends GeminiLiveEvent {
   final String text;
 }
 
+class GeminiLiveAudioChunk extends GeminiLiveEvent {
+  const GeminiLiveAudioChunk(this.bytes);
+
+  final Uint8List bytes;
+}
+
 class GeminiLiveUsageEvent extends GeminiLiveEvent {
   const GeminiLiveUsageEvent(this.usage);
 
@@ -60,36 +66,54 @@ class GeminiLiveError extends GeminiLiveEvent {
 class GeminiLiveService {
   static const _endpoint =
       'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent';
-  static const defaultModel =
-      'models/gemini-2.5-flash-native-audio-preview-12-2025';
+  static const defaultModel = 'models/gemini-3.1-flash-live-preview';
 
   final _events = StreamController<GeminiLiveEvent>.broadcast();
 
   WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _subscription;
+  Timer? _setupTimer;
   bool _isConnected = false;
+  int _connectionGeneration = 0;
 
   Stream<GeminiLiveEvent> get events => _events.stream;
   bool get isConnected => _isConnected;
+
+  @visibleForTesting
+  void handleMessageForTest(Object raw) {
+    _handleMessage(raw, _connectionGeneration);
+  }
 
   Future<void> connect({
     required String apiKey,
     required String systemInstruction,
     String model = defaultModel,
+    String voiceName = 'Kore',
   }) async {
     await disconnect();
+    final generation = ++_connectionGeneration;
 
     final uri = Uri.parse(_endpoint).replace(queryParameters: {'key': apiKey});
     final channel = WebSocketChannel.connect(uri);
     _channel = channel;
+    await channel.ready.timeout(const Duration(seconds: 8));
     _subscription = channel.stream.listen(
-      _handleMessage,
+      (raw) => _handleMessage(raw, generation),
       onError: (Object error, StackTrace stackTrace) {
+        if (generation != _connectionGeneration) return;
         _isConnected = false;
+        _setupTimer?.cancel();
         _events.add(GeminiLiveError(error.toString()));
       },
       onDone: () {
+        if (generation != _connectionGeneration) return;
+        final wasConnected = _isConnected;
         _isConnected = false;
+        _setupTimer?.cancel();
+        if (wasConnected) {
+          _events
+              .add(const GeminiLiveError('The Live Voice connection closed.'));
+        }
       },
     );
 
@@ -97,9 +121,15 @@ class GeminiLiveService {
       'setup': {
         'model': model,
         'generationConfig': {
-          'responseModalities': ['TEXT'],
+          'responseModalities': ['AUDIO'],
           'temperature': 0.7,
           'maxOutputTokens': 180,
+          'thinkingConfig': {'thinkingLevel': 'minimal'},
+          'speechConfig': {
+            'voiceConfig': {
+              'prebuiltVoiceConfig': {'voiceName': voiceName}
+            }
+          },
         },
         'systemInstruction': {
           'parts': [
@@ -117,6 +147,14 @@ class GeminiLiveService {
           },
         },
       },
+    });
+    _setupTimer = Timer(const Duration(seconds: 10), () {
+      if (generation == _connectionGeneration && !_isConnected) {
+        _events.add(
+          const GeminiLiveError('Live Voice could not finish connecting.'),
+        );
+        unawaited(disconnect());
+      }
     });
   }
 
@@ -140,19 +178,30 @@ class GeminiLiveService {
   }
 
   Future<void> disconnect() async {
+    _connectionGeneration++;
     _isConnected = false;
+    _setupTimer?.cancel();
+    _setupTimer = null;
     await _subscription?.cancel();
     _subscription = null;
     await _channel?.sink.close();
     _channel = null;
   }
 
-  void _handleMessage(dynamic raw) {
+  void _handleMessage(dynamic raw, int generation) {
+    if (generation != _connectionGeneration) return;
     try {
-      final decoded = jsonDecode(raw as String) as Map<String, dynamic>;
+      final encoded = switch (raw) {
+        String text => text,
+        List<int> bytes => utf8.decode(bytes),
+        _ => throw const FormatException('Unsupported Live Voice message.'),
+      };
+      final decoded = jsonDecode(encoded) as Map<String, dynamic>;
 
       if (decoded.containsKey('setupComplete')) {
         _isConnected = true;
+        _setupTimer?.cancel();
+        _setupTimer = null;
         _events.add(const GeminiLiveConnected());
       }
 
@@ -194,10 +243,7 @@ class GeminiLiveService {
 
       final modelTurn = serverContent['modelTurn'];
       if (modelTurn is Map<String, dynamic>) {
-        final modelText = _readModelText(modelTurn);
-        if (modelText.isNotEmpty) {
-          _events.add(GeminiLiveOutputTranscript(modelText));
-        }
+        _emitModelParts(modelTurn);
       }
 
       if (serverContent['interrupted'] == true) {
@@ -220,19 +266,25 @@ class GeminiLiveService {
     return '';
   }
 
-  String _readModelText(Map<String, dynamic> modelTurn) {
+  void _emitModelParts(Map<String, dynamic> modelTurn) {
     final parts = modelTurn['parts'];
-    if (parts is! List) return '';
-    final buffer = StringBuffer();
+    if (parts is! List) return;
     for (final part in parts) {
       if (part is Map<String, dynamic>) {
         final text = part['text'];
         if (text is String && text.trim().isNotEmpty) {
-          buffer.write(text);
+          _events.add(GeminiLiveOutputTranscript(text.trim()));
+        }
+        final inlineData = part['inlineData'];
+        if (inlineData is Map<String, dynamic>) {
+          final mimeType = inlineData['mimeType']?.toString() ?? '';
+          final data = inlineData['data'];
+          if (mimeType.startsWith('audio/') && data is String) {
+            _events.add(GeminiLiveAudioChunk(base64Decode(data)));
+          }
         }
       }
     }
-    return buffer.toString().trim();
   }
 
   int _readInt(Object? value) {

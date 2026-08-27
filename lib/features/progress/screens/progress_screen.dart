@@ -126,7 +126,7 @@ class ProgressScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                _ConsistencyCard(sessions: sessions),
+                _ConsistencyCard(progress: progress, sessions: sessions),
                 const SizedBox(height: 16),
                 GridView.builder(
                   shrinkWrap: true,
@@ -192,13 +192,17 @@ class ProgressScreen extends ConsumerWidget {
 }
 
 class _ConsistencyCard extends StatelessWidget {
-  const _ConsistencyCard({required this.sessions});
+  const _ConsistencyCard({required this.progress, required this.sessions});
 
+  final UserProgress progress;
   final List<ConversationSession> sessions;
 
   @override
   Widget build(BuildContext context) {
-    final calendar = _MonthCalendar.fromSessions(sessions: sessions);
+    final calendar = _MonthCalendar.fromActivity(
+      progress: progress,
+      sessions: sessions,
+    );
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -448,9 +452,8 @@ class _CalendarCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final surface = _calendarColor(context, day.intensity);
-    final textColor = day.intensity >= 3
-        ? Colors.white
-        : AppColors.primaryText(context);
+    final textColor =
+        day.intensity >= 3 ? Colors.white : AppColors.primaryText(context);
 
     return Tooltip(
       message:
@@ -698,7 +701,8 @@ class _MonthCalendar {
   final int yearActiveDays;
   final int monthMinutes;
 
-  factory _MonthCalendar.fromSessions({
+  factory _MonthCalendar.fromActivity({
+    required UserProgress progress,
     required List<ConversationSession> sessions,
   }) {
     final today = _dateOnly(DateTime.now());
@@ -711,6 +715,18 @@ class _MonthCalendar {
     final weekStart = _startOfWeek(today);
     final activity = <DateTime, _PracticeDay>{};
 
+    for (final entry in progress.activityByDate.entries) {
+      final parsed = DateTime.tryParse(entry.key);
+      if (parsed == null || !entry.value.isActive) continue;
+      final day = _dateOnly(parsed);
+      activity[day] = _PracticeDay(
+        date: day,
+        sessions: entry.value.sessions,
+        minutes: entry.value.minutes,
+        corrections: entry.value.corrections,
+      );
+    }
+
     for (final session in sessions) {
       if (session.userTurns == 0) continue;
       final day = _dateOnly(session.updatedAt);
@@ -720,6 +736,8 @@ class _MonthCalendar {
         duration.inMinutes.clamp(1, 45),
       );
       final existing = activity[day];
+      final trackedByProgress =
+          progress.activityByDate.containsKey(UserProgress.dateKey(day));
       if (existing == null) {
         activity[day] = _PracticeDay(
           date: day,
@@ -729,9 +747,15 @@ class _MonthCalendar {
         );
       } else {
         activity[day] = existing.copyWith(
-          sessions: existing.sessions + 1,
-          minutes: existing.minutes + estimatedMinutes,
-          corrections: existing.corrections + session.correctionCount,
+          sessions: trackedByProgress
+              ? math.max(existing.sessions, 1)
+              : existing.sessions + 1,
+          minutes: trackedByProgress
+              ? math.max(existing.minutes, estimatedMinutes)
+              : existing.minutes + estimatedMinutes,
+          corrections: trackedByProgress
+              ? math.max(existing.corrections, session.correctionCount)
+              : existing.corrections + session.correctionCount,
         );
       }
     }
@@ -880,6 +904,9 @@ class _ProgressRankSnapshot {
     required List<ConversationSession> sessions,
   }) {
     final uniqueDays = <String>{};
+    for (final entry in progress.activityByDate.entries) {
+      if (entry.value.isActive) uniqueDays.add(entry.key);
+    }
     for (final session in sessions) {
       if (session.userTurns == 0) continue;
       final date = session.updatedAt;

@@ -104,7 +104,7 @@ class LlmRouterService {
         id: 'gemini',
         apiKey: settings.geminiApiKey,
         baseUrl: '',
-        model: 'gemini-2.0-flash',
+        model: 'gemini-3.5-flash-lite',
         isGemini: true,
       ),
       _ProviderConfig(
@@ -131,12 +131,18 @@ class LlmRouterService {
     );
     final failures = <String>[];
     final blockedProviderIds = <String>{};
+    final requestClock = Stopwatch()..start();
 
     for (final provider in orderedProviders) {
       if (!provider.isReady ||
           blockedProviderIds.contains(provider.id) ||
           _isCoolingDown(provider.cooldownKey)) {
         continue;
+      }
+      final remaining = requestTimeout - requestClock.elapsed;
+      if (remaining <= Duration.zero) {
+        failures.add('The AI request timed out.');
+        break;
       }
       try {
         final result = provider.isGemini
@@ -147,13 +153,13 @@ class LlmRouterService {
                 userText,
                 maxOutputTokens: maxOutputTokens,
                 maxHistoryMessages: maxHistoryMessages,
-                requestTimeout: requestTimeout,
+                requestTimeout: remaining,
               )
             : await _sendOpenAiCompatible(
                 provider,
                 openAiMessages,
                 maxOutputTokens: maxOutputTokens,
-                requestTimeout: requestTimeout,
+                requestTimeout: remaining,
               );
         final exactTotalTokens = result.totalTokens;
         return _parseResponse(
@@ -213,13 +219,13 @@ class LlmRouterService {
             id: 'groq',
             apiKey: apiKey,
             baseUrl: 'https://api.groq.com/openai/v1',
-            model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+            model: 'openai/gpt-oss-20b',
           ),
         'gemini' => _ProviderConfig(
             id: 'gemini',
             apiKey: apiKey,
             baseUrl: '',
-            model: 'gemini-2.0-flash',
+            model: 'gemini-3.5-flash-lite',
             isGemini: true,
           ),
         'openrouter' => _ProviderConfig(
@@ -363,11 +369,14 @@ class LlmRouterService {
   }) {
     const start = '|||CORRECTIONS|||';
     const end = '|||END|||';
-    final startIndex = raw.indexOf(start);
-    final endIndex = raw.indexOf(end);
-    if (startIndex == -1 || endIndex == -1 || endIndex <= startIndex) {
+    final trimmedRaw = raw.trim();
+    final startIndex = trimmedRaw.indexOf(start);
+    final endIndex = trimmedRaw.indexOf(end);
+    if (startIndex == -1) {
       return LlmResponse(
-        text: raw.trim(),
+        text: trimmedRaw.isEmpty
+            ? 'I am here. Could you say that again?'
+            : trimmedRaw,
         provider: provider,
         model: model,
         promptTokens: promptTokens,
@@ -377,19 +386,29 @@ class LlmRouterService {
       );
     }
 
-    final spokenText = raw.substring(0, startIndex).trim();
-    final jsonText = raw.substring(startIndex + start.length, endIndex).trim();
-    final decoded = jsonDecode(jsonText);
-    final corrections = decoded is List
-        ? decoded
-            .whereType<Map>()
-            .map((item) =>
-                GrammarCorrection.fromJson(Map<String, dynamic>.from(item)))
-            .toList()
-        : <GrammarCorrection>[];
+    final spokenText = trimmedRaw.substring(0, startIndex).trim();
+    var corrections = <GrammarCorrection>[];
+    if (endIndex > startIndex) {
+      final jsonText =
+          trimmedRaw.substring(startIndex + start.length, endIndex).trim();
+      try {
+        final decoded = jsonDecode(jsonText);
+        corrections = decoded is List
+            ? decoded
+                .whereType<Map>()
+                .map((item) =>
+                    GrammarCorrection.fromJson(Map<String, dynamic>.from(item)))
+                .toList()
+            : <GrammarCorrection>[];
+      } on FormatException {
+        corrections = <GrammarCorrection>[];
+      }
+    }
 
     return LlmResponse(
-      text: spokenText,
+      text: spokenText.isEmpty
+          ? 'I am here. Could you say that again?'
+          : spokenText,
       provider: provider,
       model: model,
       promptTokens: promptTokens,
@@ -474,15 +493,10 @@ class LlmRouterService {
   List<_ProviderConfig> _groqProviders(AppSettings settings) {
     if (!settings.hasGroqKey) return const [];
 
-    const fastModels = [
-      'meta-llama/llama-4-scout-17b-16e-instruct',
-      'llama-3.1-8b-instant',
-    ];
+    const fastModels = ['openai/gpt-oss-20b'];
     const smartModels = [
-      'meta-llama/llama-4-maverick-17b-128e-instruct',
-      'meta-llama/llama-4-scout-17b-16e-instruct',
-      'llama-3.3-70b-versatile',
-      'llama-3.1-8b-instant',
+      'openai/gpt-oss-120b',
+      'openai/gpt-oss-20b',
     ];
 
     return [
@@ -557,11 +571,8 @@ class _ProviderConfig {
   String get cooldownKey => '$id:$model';
 
   String get label => switch (id) {
-        'groq' when model == 'meta-llama/llama-4-maverick-17b-128e-instruct' =>
-          'Groq Maverick',
-        'groq' when model == 'meta-llama/llama-4-scout-17b-16e-instruct' =>
-          'Groq Scout',
-        'groq' when model == 'llama-3.1-8b-instant' => 'Groq Fast',
+        'groq' when model == 'openai/gpt-oss-120b' => 'Groq Smart',
+        'groq' when model == 'openai/gpt-oss-20b' => 'Groq Fast',
         'groq' => 'Groq',
         'gemini' => 'Gemini',
         'openrouter' => 'OpenRouter',

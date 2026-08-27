@@ -191,20 +191,6 @@ class ApiUsage {
   int get groqAudioSeconds => entry('groq:whisper-large-v3-turbo').audioSeconds;
   int get groqWhisperRequests => entry('groq:whisper-large-v3-turbo').requests;
 
-  int get estimatedGroqPracticeMinutesLeft {
-    const dailyAudioSeconds = 28800;
-    const dailyTokens = 100000;
-    final audioMinutesLeft =
-        ((dailyAudioSeconds - groqAudioSeconds).clamp(0, dailyAudioSeconds) /
-                60)
-            .floor();
-    final tokenMinutesLeft =
-        ((dailyTokens - groqChatTokens).clamp(0, dailyTokens) / 900).floor();
-    return audioMinutesLeft < tokenMinutesLeft
-        ? audioMinutesLeft
-        : tokenMinutesLeft;
-  }
-
   Map<String, dynamic> toJson() => {
         'dateKey': dateKey,
         'entries': entries.map((key, value) => MapEntry(key, value.toJson())),

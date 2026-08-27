@@ -10,6 +10,7 @@ class UserProgress {
     this.errorsCorrected = 0,
     this.todayMinutesPracticed = 0,
     this.todayDateKey = '',
+    this.activityByDate = const {},
   });
 
   final int xp;
@@ -20,18 +21,26 @@ class UserProgress {
   final int errorsCorrected;
   final int todayMinutesPracticed;
   final String todayDateKey;
+  final Map<String, DailyPracticeActivity> activityByDate;
 
-  static String todayKey() {
-    final now = DateTime.now();
+  static String dateKey(DateTime date) {
+    final now = date.toLocal();
     return '${now.year.toString().padLeft(4, '0')}-'
         '${now.month.toString().padLeft(2, '0')}-'
         '${now.day.toString().padLeft(2, '0')}';
   }
 
+  static String todayKey() => dateKey(DateTime.now());
+
   UserProgress normalizedForToday() {
     final today = todayKey();
-    if (todayDateKey == today) return this;
-    return copyWith(todayDateKey: today, todayMinutesPracticed: 0);
+    final normalized = todayDateKey == today
+        ? this
+        : copyWith(todayDateKey: today, todayMinutesPracticed: 0);
+    if (normalized.activityByDate.isEmpty) return normalized;
+    return normalized.copyWith(
+      streak: _calculateStreak(normalized.activityByDate, DateTime.now()),
+    );
   }
 
   LevelDefinition get level {
@@ -65,6 +74,7 @@ class UserProgress {
     int? errorsCorrected,
     int? todayMinutesPracticed,
     String? todayDateKey,
+    Map<String, DailyPracticeActivity>? activityByDate,
   }) {
     return UserProgress(
       xp: xp ?? this.xp,
@@ -76,6 +86,7 @@ class UserProgress {
       todayMinutesPracticed:
           todayMinutesPracticed ?? this.todayMinutesPracticed,
       todayDateKey: todayDateKey ?? this.todayDateKey,
+      activityByDate: activityByDate ?? this.activityByDate,
     );
   }
 
@@ -88,6 +99,9 @@ class UserProgress {
         'errorsCorrected': errorsCorrected,
         'todayMinutesPracticed': todayMinutesPracticed,
         'todayDateKey': todayDateKey,
+        'activityByDate': activityByDate.map(
+          (key, value) => MapEntry(key, value.toJson()),
+        ),
       };
 
   factory UserProgress.fromJson(Map<dynamic, dynamic> json) {
@@ -101,6 +115,73 @@ class UserProgress {
       todayMinutesPracticed:
           (json['todayMinutesPracticed'] as num?)?.toInt() ?? 0,
       todayDateKey: json['todayDateKey']?.toString() ?? '',
+      activityByDate: (json['activityByDate'] as Map?)?.map(
+            (key, value) => MapEntry(
+              key.toString(),
+              value is Map
+                  ? DailyPracticeActivity.fromJson(value)
+                  : const DailyPracticeActivity(),
+            ),
+          ) ??
+          const {},
     ).normalizedForToday();
+  }
+
+  static int _calculateStreak(
+    Map<String, DailyPracticeActivity> activity,
+    DateTime now,
+  ) {
+    var day = DateTime(now.year, now.month, now.day);
+    if (!(activity[dateKey(day)]?.isActive ?? false)) {
+      day = day.subtract(const Duration(days: 1));
+      if (!(activity[dateKey(day)]?.isActive ?? false)) return 0;
+    }
+
+    var count = 0;
+    while (activity[dateKey(day)]?.isActive ?? false) {
+      count++;
+      day = day.subtract(const Duration(days: 1));
+    }
+    return count;
+  }
+}
+
+class DailyPracticeActivity {
+  const DailyPracticeActivity({
+    this.minutes = 0,
+    this.sessions = 0,
+    this.corrections = 0,
+  });
+
+  final int minutes;
+  final int sessions;
+  final int corrections;
+
+  bool get isActive => minutes > 0 || sessions > 0;
+
+  DailyPracticeActivity copyWith({
+    int? minutes,
+    int? sessions,
+    int? corrections,
+  }) {
+    return DailyPracticeActivity(
+      minutes: minutes ?? this.minutes,
+      sessions: sessions ?? this.sessions,
+      corrections: corrections ?? this.corrections,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'minutes': minutes,
+        'sessions': sessions,
+        'corrections': corrections,
+      };
+
+  factory DailyPracticeActivity.fromJson(Map<dynamic, dynamic> json) {
+    return DailyPracticeActivity(
+      minutes: (json['minutes'] as num?)?.toInt() ?? 0,
+      sessions: (json['sessions'] as num?)?.toInt() ?? 0,
+      corrections: (json['corrections'] as num?)?.toInt() ?? 0,
+    );
   }
 }

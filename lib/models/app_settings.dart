@@ -59,8 +59,8 @@ class AppSettings {
   bool get isGroqSmartMode => groqChatMode == 'smart';
 
   String get groqChatModel => switch (groqChatMode) {
-        'smart' => 'meta-llama/llama-4-maverick-17b-128e-instruct',
-        _ => 'meta-llama/llama-4-scout-17b-16e-instruct',
+        'smart' => 'openai/gpt-oss-120b',
+        _ => 'openai/gpt-oss-20b',
       };
 
   String get groqChatModeLabel => switch (groqChatMode) {
@@ -70,9 +70,8 @@ class AppSettings {
 
   String get groqChatModeSummary => switch (groqChatMode) {
         'smart' =>
-          'Llama 4 Maverick gives richer answers and stronger reasoning for deeper practice.',
-        _ =>
-          'Llama 4 Scout keeps daily practice quick, natural, and responsive.',
+          'GPT-OSS 120B gives richer answers and stronger reasoning for deeper practice.',
+        _ => 'GPT-OSS 20B keeps daily practice quick, natural, and responsive.',
       };
 
   bool get isDeepSeekProMode => deepSeekChatMode == 'pro';
@@ -171,13 +170,7 @@ class AppSettings {
         'pro' => 'pro',
         _ => 'flash',
       },
-      preferredProvider: switch (json['preferredProvider']?.toString()) {
-        'groq' => 'groq',
-        'gemini' => 'gemini',
-        'openrouter' => 'openrouter',
-        'deepseek' => 'deepseek',
-        _ => 'auto',
-      },
+      preferredProvider: 'auto',
       voiceName: json['voiceName']?.toString() ?? '',
       speakingSpeed: (json['speakingSpeed'] as num?)?.toDouble() ?? 1.0,
       accent: json['accent']?.toString() ?? 'US',

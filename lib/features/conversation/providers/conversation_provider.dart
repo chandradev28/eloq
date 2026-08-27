@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/constants/topics.dart';
+import '../../../core/utils/app_error_message.dart';
 import '../../../features/settings/providers/settings_provider.dart';
 import '../../../models/conversation_session.dart';
 import '../../../services/audio_recorder_service.dart';
@@ -17,6 +18,7 @@ class ConversationState {
     this.isRecording = false,
     this.isTranscribing = false,
     this.isThinking = false,
+    this.isSpeaking = false,
     this.currentAudioPath,
     this.error,
   });
@@ -26,6 +28,7 @@ class ConversationState {
   final bool isRecording;
   final bool isTranscribing;
   final bool isThinking;
+  final bool isSpeaking;
   final String? currentAudioPath;
   final String? error;
 
@@ -34,6 +37,7 @@ class ConversationState {
     bool? isRecording,
     bool? isTranscribing,
     bool? isThinking,
+    bool? isSpeaking,
     String? currentAudioPath,
     String? error,
     bool clearAudioPath = false,
@@ -45,6 +49,7 @@ class ConversationState {
       isRecording: isRecording ?? this.isRecording,
       isTranscribing: isTranscribing ?? this.isTranscribing,
       isThinking: isThinking ?? this.isThinking,
+      isSpeaking: isSpeaking ?? this.isSpeaking,
       currentAudioPath:
           clearAudioPath ? null : currentAudioPath ?? this.currentAudioPath,
       error: clearError ? null : error ?? this.error,
@@ -71,8 +76,11 @@ class ConversationController extends StateNotifier<ConversationState> {
   late DateTime _historyStartedAt;
   DateTime? _recordingStartedAt;
   bool _sessionCounted = false;
+  bool _disposed = false;
+  int _runtimeGeneration = 0;
 
   Future<void> restoreSession(ConversationSession session) async {
+    _runtimeGeneration++;
     await _resetRuntimeState();
     _sessionId = session.id;
     _historyStartedAt = session.startedAt;
@@ -88,6 +96,7 @@ class ConversationController extends StateNotifier<ConversationState> {
   }
 
   Future<void> startNewSession() async {
+    _runtimeGeneration++;
     await _resetRuntimeState();
     final now = DateTime.now();
     _sessionId = _uuid.v4();
@@ -99,14 +108,28 @@ class ConversationController extends StateNotifier<ConversationState> {
   }
 
   Future<void> toggleRecording() async {
+    if (state.isTranscribing || state.isThinking) return;
     if (state.isRecording) {
       await stopRecordingAndSend();
     } else {
+      if (state.isSpeaking) {
+        await ref.read(ttsServiceProvider).stop();
+        if (!_disposed) {
+          state = state.copyWith(isSpeaking: false);
+        }
+      }
       await startRecording();
     }
   }
 
   Future<void> startRecording() async {
+    if (!ref.read(settingsProvider).hasGroqKey) {
+      state = state.copyWith(
+        error:
+            'Add your Groq API key in Settings to transcribe microphone audio.',
+      );
+      return;
+    }
     final recorder = ref.read(audioRecorderServiceProvider);
     final hasPermission = await recorder.hasPermission();
     if (!hasPermission) {
@@ -125,9 +148,11 @@ class ConversationController extends StateNotifier<ConversationState> {
   }
 
   Future<void> stopRecordingAndSend() async {
+    final generation = _runtimeGeneration;
     final recorder = ref.read(audioRecorderServiceProvider);
     final settings = ref.read(settingsProvider);
     final path = await recorder.stop() ?? state.currentAudioPath;
+    if (!_isCurrent(generation)) return;
     state = state.copyWith(
       isRecording: false,
       isTranscribing: true,
@@ -139,34 +164,40 @@ class ConversationController extends StateNotifier<ConversationState> {
       if (path == null || path.isEmpty) {
         throw StateError('No audio file was captured.');
       }
-      final text = settings.hasGroqKey
-          ? await ref
-              .read(whisperServiceProvider)
-              .transcribe(apiKey: settings.groqApiKey, filePath: path)
-              .timeout(const Duration(seconds: 25))
-          : 'I want to practice speaking English.';
-      if (settings.hasGroqKey) {
-        final seconds = DateTime.now()
-            .difference(_recordingStartedAt ?? DateTime.now())
-            .inSeconds
-            .clamp(1, 3600);
-        await ref.read(usageProvider.notifier).trackAudio(
-              provider: 'groq',
-              model: 'whisper-large-v3-turbo',
-              seconds: seconds,
-            );
+      if (!settings.hasGroqKey) {
+        throw StateError(
+          'Add your Groq API key in Settings to transcribe microphone audio.',
+        );
       }
+      final text = await ref
+          .read(whisperServiceProvider)
+          .transcribe(apiKey: settings.groqApiKey, filePath: path)
+          .timeout(const Duration(seconds: 16));
+      if (!_isCurrent(generation)) return;
+      final seconds = DateTime.now()
+          .difference(_recordingStartedAt ?? DateTime.now())
+          .inSeconds
+          .clamp(1, 3600);
+      await ref.read(usageProvider.notifier).trackAudio(
+            provider: 'groq',
+            model: 'whisper-large-v3-turbo',
+            seconds: seconds,
+          );
       await sendText(text);
     } catch (error) {
-      state = state.copyWith(error: error.toString());
+      if (!_isCurrent(generation)) return;
+      state = state.copyWith(error: AppErrorMessage.from(error));
     } finally {
-      state = state.copyWith(isTranscribing: false);
+      if (_isCurrent(generation)) {
+        state = state.copyWith(isTranscribing: false);
+      }
     }
   }
 
   Future<void> sendText(String rawText) async {
     final text = rawText.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || state.isThinking) return;
+    final generation = _runtimeGeneration;
 
     final previousMessages = state.messages;
     final userMessage = Message(
@@ -190,6 +221,7 @@ class ConversationController extends StateNotifier<ConversationState> {
             history: previousMessages,
             userText: text,
           );
+      if (!_isCurrent(generation)) return;
       final assistantMessage = Message(
         id: _uuid.v4(),
         role: MessageRole.assistant,
@@ -201,7 +233,9 @@ class ConversationController extends StateNotifier<ConversationState> {
         messages: [...state.messages, assistantMessage],
         isThinking: false,
       );
-      if (response.provider != 'demo' && response.provider != 'fallback') {
+      final isRealResponse =
+          response.provider != 'demo' && response.provider != 'fallback';
+      if (isRealResponse) {
         await ref.read(usageProvider.notifier).trackChat(
               provider: response.provider,
               model: response.model,
@@ -210,17 +244,27 @@ class ConversationController extends StateNotifier<ConversationState> {
               totalTokens: response.totalTokens,
               isEstimated: response.isTokenUsageEstimated,
             );
+        await ref.read(progressProvider.notifier).addMessageXp(
+              corrections: response.corrections.length,
+            );
+        await _countSessionOnce();
+        await _saveSession(response.provider);
       }
-      await ref.read(progressProvider.notifier).addMessageXp(
-            corrections: response.corrections.length,
-          );
-      await _countSessionOnce();
-      await _saveSession(response.provider);
+      if (!_isCurrent(generation)) return;
+      state = state.copyWith(isSpeaking: true);
       await ref
           .read(ttsServiceProvider)
           .speak(response.text, speed: settings.speakingSpeed);
+      if (_isCurrent(generation)) {
+        state = state.copyWith(isSpeaking: false);
+      }
     } catch (error) {
-      state = state.copyWith(isThinking: false, error: error.toString());
+      if (!_isCurrent(generation)) return;
+      state = state.copyWith(
+        isThinking: false,
+        isSpeaking: false,
+        error: AppErrorMessage.from(error),
+      );
     }
   }
 
@@ -228,9 +272,17 @@ class ConversationController extends StateNotifier<ConversationState> {
     final settings = ref.read(settingsProvider);
     final last = state.messages.where((item) => !item.isUser).lastOrNull;
     if (last == null) return;
-    await ref
-        .read(ttsServiceProvider)
-        .speak(last.text, speed: settings.speakingSpeed);
+    final generation = _runtimeGeneration;
+    state = state.copyWith(isSpeaking: true, clearError: true);
+    try {
+      await ref
+          .read(ttsServiceProvider)
+          .speak(last.text, speed: settings.speakingSpeed);
+    } finally {
+      if (_isCurrent(generation)) {
+        state = state.copyWith(isSpeaking: false);
+      }
+    }
   }
 
   void _seedGreeting() {
@@ -298,6 +350,29 @@ class ConversationController extends StateNotifier<ConversationState> {
       await recorder.cancel();
     }
     _recordingStartedAt = null;
+  }
+
+  Future<void> endSession() async {
+    _runtimeGeneration++;
+    await _resetRuntimeState();
+  }
+
+  bool _isCurrent(int generation) {
+    return !_disposed && generation == _runtimeGeneration;
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _runtimeGeneration++;
+    final recorder = ref.read(audioRecorderServiceProvider);
+    Future<void>(() async {
+      if (await recorder.isRecording()) {
+        await recorder.cancel();
+      }
+      await ref.read(ttsServiceProvider).stop();
+    });
+    super.dispose();
   }
 }
 

@@ -47,9 +47,18 @@ class ProgressNotifier extends StateNotifier<UserProgress> {
 
   Future<void> addMessageXp({int corrections = 0}) async {
     final current = state.normalizedForToday();
+    final today = UserProgress.todayKey();
+    final activity =
+        current.activityByDate[today] ?? const DailyPracticeActivity();
     final next = current.copyWith(
       xp: current.xp + 10 + (corrections * 5),
       errorsCorrected: current.errorsCorrected + corrections,
+      activityByDate: {
+        ...current.activityByDate,
+        today: activity.copyWith(
+          corrections: activity.corrections + corrections,
+        ),
+      },
     );
     state = next;
     await _storage.saveProgress(next);
@@ -57,13 +66,22 @@ class ProgressNotifier extends StateNotifier<UserProgress> {
 
   Future<void> completeConversation({required int minutesPracticed}) async {
     final current = state.normalizedForToday();
+    final today = UserProgress.todayKey();
+    final activity =
+        current.activityByDate[today] ?? const DailyPracticeActivity();
     final next = current.copyWith(
       totalConversations: current.totalConversations + 1,
       minutesPracticed: current.minutesPracticed + minutesPracticed,
       todayMinutesPracticed: current.todayMinutesPracticed + minutesPracticed,
-      todayDateKey: UserProgress.todayKey(),
-      streak: current.streak == 0 ? 1 : current.streak,
-    );
+      todayDateKey: today,
+      activityByDate: {
+        ...current.activityByDate,
+        today: activity.copyWith(
+          minutes: activity.minutes + minutesPracticed,
+          sessions: activity.sessions + 1,
+        ),
+      },
+    ).normalizedForToday();
     state = next;
     await _storage.saveProgress(next);
   }

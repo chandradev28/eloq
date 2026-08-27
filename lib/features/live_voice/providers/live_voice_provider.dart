@@ -6,11 +6,13 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/constants/prompts.dart';
 import '../../../core/constants/topics.dart';
+import '../../../core/utils/app_error_message.dart';
 import '../../../features/conversation/models/message.dart';
 import '../../../features/settings/providers/settings_provider.dart';
 import '../../../models/conversation_session.dart';
 import '../../../services/audio_recorder_service.dart';
 import '../../../services/gemini_live_service.dart';
+import '../../../services/native_audio_playback_service.dart';
 import '../../../services/tts_service.dart';
 
 class LiveVoiceState {
@@ -31,7 +33,6 @@ class LiveVoiceState {
     this.timerFinished = false,
     this.userDraft = '',
     this.assistantDraft = '',
-    this.isUsingFallback = false,
   });
 
   final String topicId;
@@ -50,7 +51,6 @@ class LiveVoiceState {
   final bool timerFinished;
   final String userDraft;
   final String assistantDraft;
-  final bool isUsingFallback;
 
   LiveVoiceState copyWith({
     String? topicId,
@@ -69,7 +69,6 @@ class LiveVoiceState {
     bool? timerFinished,
     String? userDraft,
     String? assistantDraft,
-    bool? isUsingFallback,
     bool clearError = false,
   }) {
     return LiveVoiceState(
@@ -89,7 +88,6 @@ class LiveVoiceState {
       timerFinished: timerFinished ?? this.timerFinished,
       userDraft: userDraft ?? this.userDraft,
       assistantDraft: assistantDraft ?? this.assistantDraft,
-      isUsingFallback: isUsingFallback ?? this.isUsingFallback,
     );
   }
 }
@@ -108,12 +106,17 @@ class LiveVoiceController extends StateNotifier<LiveVoiceState> {
   late DateTime _historyStartedAt;
   String _sessionId = const Uuid().v4();
   bool _sessionCounted = false;
+  bool _disposed = false;
+  bool _playedNativeAudioThisTurn = false;
   int _turnAudioBytes = 0;
+  int _runtimeGeneration = 0;
   GeminiLiveUsage _latestUsage = const GeminiLiveUsage();
+  Future<void> _eventQueue = Future<void>.value();
 
   StreamSubscription<GeminiLiveEvent>? _liveSubscription;
   StreamSubscription<Uint8List>? _audioSubscription;
   Timer? _timer;
+  Timer? _turnFinalizeTimer;
 
   Future<void> applySetup({
     required String topicId,
@@ -177,14 +180,28 @@ class LiveVoiceController extends StateNotifier<LiveVoiceState> {
 
     await _stopRuntimeWork();
     await _liveSubscription?.cancel();
+    final generation = ++_runtimeGeneration;
     final live = ref.read(geminiLiveServiceProvider);
-    _liveSubscription = live.events.listen(_handleLiveEvent);
+    _liveSubscription = live.events.listen((event) {
+      final previousEvent = _eventQueue;
+      _eventQueue = () async {
+        try {
+          await previousEvent;
+          if (_isCurrent(generation)) {
+            await _handleLiveEvent(event, generation);
+          }
+        } catch (error) {
+          if (_isCurrent(generation)) {
+            state = state.copyWith(error: AppErrorMessage.from(error));
+          }
+        }
+      }();
+    });
 
     state = state.copyWith(
       isConnecting: true,
       isSessionActive: true,
       isListening: false,
-      isUsingFallback: false,
       showTranscript: true,
       clearError: true,
     );
@@ -205,23 +222,31 @@ class LiveVoiceController extends StateNotifier<LiveVoiceState> {
       await live.connect(
         apiKey: settings.geminiApiKey.trim(),
         systemInstruction: systemPrompt,
+        voiceName: settings.voiceName.trim().isEmpty
+            ? 'Kore'
+            : settings.voiceName.trim(),
       );
     } catch (error) {
+      if (!_isCurrent(generation)) return;
+      await live.disconnect();
       state = state.copyWith(
         isConnecting: false,
         isSessionActive: false,
-        error: error.toString(),
+        error: AppErrorMessage.from(error),
       );
     }
   }
 
   Future<void> endSession() async {
+    _runtimeGeneration++;
     _timer?.cancel();
+    _turnFinalizeTimer?.cancel();
     await _stopRuntimeWork();
     await _liveSubscription?.cancel();
     _liveSubscription = null;
     await ref.read(geminiLiveServiceProvider).disconnect();
 
+    if (_disposed) return;
     state = state.copyWith(
       isConnecting: false,
       isSessionActive: false,
@@ -299,22 +324,25 @@ class LiveVoiceController extends StateNotifier<LiveVoiceState> {
     final last = state.messages.where((message) => !message.isUser).lastOrNull;
     if (last == null) return;
     final settings = ref.read(settingsProvider);
+    final generation = _runtimeGeneration;
+    await _stopMicStreaming();
+    await ref.read(nativeAudioPlaybackServiceProvider).stop();
     state = state.copyWith(isSpeaking: true, clearError: true);
     await ref
         .read(ttsServiceProvider)
         .speak(last.text, speed: settings.speakingSpeed);
+    if (!_isCurrent(generation)) return;
     state = state.copyWith(isSpeaking: false);
     if (state.isSessionActive) {
       await _startMicStreaming();
     }
   }
 
-  Future<void> useStandardFallback() async {
-    await endSession();
-    state = state.copyWith(isUsingFallback: true);
-  }
-
-  Future<void> _handleLiveEvent(GeminiLiveEvent event) async {
+  Future<void> _handleLiveEvent(
+    GeminiLiveEvent event,
+    int generation,
+  ) async {
+    if (!_isCurrent(generation)) return;
     switch (event) {
       case GeminiLiveConnected():
         state = state.copyWith(
@@ -327,31 +355,47 @@ class LiveVoiceController extends StateNotifier<LiveVoiceState> {
         await _startMicStreaming();
       case GeminiLiveInputTranscript(:final text):
         state = state.copyWith(
-          userDraft: text,
+          userDraft: _mergeTranscript(state.userDraft, text),
           showTranscript: true,
           isListening: true,
         );
       case GeminiLiveOutputTranscript(:final text):
         _commitUserDraftIfNeeded();
         state = state.copyWith(
-          assistantDraft: text,
+          assistantDraft: _mergeTranscript(state.assistantDraft, text),
           isListening: false,
           showTranscript: true,
         );
+      case GeminiLiveAudioChunk(:final bytes):
+        _playedNativeAudioThisTurn =
+            await ref.read(nativeAudioPlaybackServiceProvider).write(bytes) ||
+                _playedNativeAudioThisTurn;
+        if (_isCurrent(generation)) {
+          state = state.copyWith(isSpeaking: true, showTranscript: true);
+        }
       case GeminiLiveUsageEvent(:final usage):
         _latestUsage = usage;
       case GeminiLiveTurnComplete():
-        await _finalizeAssistantTurn();
+        _scheduleTurnFinalization(generation);
       case GeminiLiveInterrupted():
+        _turnFinalizeTimer?.cancel();
+        await ref.read(nativeAudioPlaybackServiceProvider).stop();
+        _playedNativeAudioThisTurn = false;
         state = state.copyWith(
           assistantDraft: '',
           isListening: true,
+          isSpeaking: false,
         );
       case GeminiLiveError(:final message):
+        await _stopRuntimeWork();
+        await ref.read(geminiLiveServiceProvider).disconnect();
         state = state.copyWith(
           isConnecting: false,
+          isSessionActive: false,
           isListening: false,
-          error: message,
+          isSpeaking: false,
+          isTimerRunning: false,
+          error: AppErrorMessage.from(message),
         );
     }
   }
@@ -383,7 +427,10 @@ class LiveVoiceController extends StateNotifier<LiveVoiceState> {
         unawaited(ref.read(geminiLiveServiceProvider).sendAudioChunk(chunk));
       },
       onError: (Object error, StackTrace stackTrace) {
-        state = state.copyWith(error: error.toString(), isListening: false);
+        state = state.copyWith(
+          error: AppErrorMessage.from(error),
+          isListening: false,
+        );
       },
       onDone: () {
         state = state.copyWith(isListening: false);
@@ -430,17 +477,25 @@ class LiveVoiceController extends StateNotifier<LiveVoiceState> {
     _turnAudioBytes = 0;
   }
 
-  Future<void> _finalizeAssistantTurn() async {
+  void _scheduleTurnFinalization(int generation) {
+    _turnFinalizeTimer?.cancel();
+    _turnFinalizeTimer = Timer(const Duration(milliseconds: 350), () {
+      if (_isCurrent(generation)) {
+        unawaited(_finalizeAssistantTurn(generation));
+      }
+    });
+  }
+
+  Future<void> _finalizeAssistantTurn(int generation) async {
+    if (!_isCurrent(generation)) return;
     _commitUserDraftIfNeeded();
     final assistantText = state.assistantDraft.trim();
     if (assistantText.isEmpty) {
-      if (state.isSessionActive && !state.timerFinished) {
-        await _startMicStreaming();
-      }
+      state = state.copyWith(isSpeaking: false);
+      _playedNativeAudioThisTurn = false;
       return;
     }
 
-    await _stopMicStreaming();
     final settings = ref.read(settingsProvider);
     final assistantMessage = Message(
       id: _uuid.v4(),
@@ -471,9 +526,15 @@ class LiveVoiceController extends StateNotifier<LiveVoiceState> {
     await ref.read(progressProvider.notifier).addMessageXp();
     await _countSessionOnce();
     await _saveSession();
-    await ref
-        .read(ttsServiceProvider)
-        .speak(assistantText, speed: settings.speakingSpeed);
+    if (!_isCurrent(generation)) return;
+    if (!_playedNativeAudioThisTurn) {
+      await _stopMicStreaming();
+      await ref
+          .read(ttsServiceProvider)
+          .speak(assistantText, speed: settings.speakingSpeed);
+    }
+    _playedNativeAudioThisTurn = false;
+    if (!_isCurrent(generation)) return;
     state = state.copyWith(isSpeaking: false);
 
     if (state.isSessionActive && !state.timerFinished) {
@@ -561,13 +622,28 @@ class LiveVoiceController extends StateNotifier<LiveVoiceState> {
 
   Future<void> _stopRuntimeWork() async {
     _timer?.cancel();
+    _turnFinalizeTimer?.cancel();
     await _audioSubscription?.cancel();
     _audioSubscription = null;
     final recorder = ref.read(audioRecorderServiceProvider);
     if (await recorder.isRecording()) {
       await recorder.stop();
     }
+    await ref.read(nativeAudioPlaybackServiceProvider).stop();
     await ref.read(ttsServiceProvider).stop();
+  }
+
+  String _mergeTranscript(String current, String incoming) {
+    final existing = current.trim();
+    final next = incoming.trim();
+    if (next.isEmpty) return existing;
+    if (existing.isEmpty || next.startsWith(existing)) return next;
+    if (existing.startsWith(next) || existing.endsWith(next)) return existing;
+    return '$existing $next';
+  }
+
+  bool _isCurrent(int generation) {
+    return !_disposed && generation == _runtimeGeneration;
   }
 
   int _secondsForMinutes(int minutes) => minutes <= 0 ? 0 : minutes * 60;
@@ -582,7 +658,10 @@ class LiveVoiceController extends StateNotifier<LiveVoiceState> {
 
   @override
   void dispose() {
+    _disposed = true;
+    _runtimeGeneration++;
     _timer?.cancel();
+    _turnFinalizeTimer?.cancel();
     unawaited(_stopRuntimeWork());
     unawaited(_liveSubscription?.cancel());
     unawaited(ref.read(geminiLiveServiceProvider).disconnect());

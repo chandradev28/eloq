@@ -189,8 +189,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                         _MiniNote(
                           text: settings.isGroqSmartMode
-                              ? 'Uses Llama 4 Maverick first, then current Groq fallbacks.'
-                              : 'Uses Llama 4 Scout first for quick voice replies.',
+                              ? 'Uses GPT-OSS 120B, then GPT-OSS 20B if needed.'
+                              : 'Uses GPT-OSS 20B for the lowest response delay.',
                         ),
                       ],
                     ),
@@ -747,9 +747,6 @@ class _UsageCard extends StatelessWidget {
                 audioSeconds: 0,
               )
             : usage.summaryForProvider(selectedProviderId);
-    final practiceMinutesLeft = selectedProviderId == 'groq'
-        ? usage.estimatedGroqPracticeMinutesLeft
-        : null;
     final providerLabel = switch (selectedProviderId) {
       'auto' => 'Auto router',
       'none' => 'No API connected',
@@ -896,16 +893,7 @@ class _UsageCard extends StatelessWidget {
               ),
             ),
           ],
-          const SizedBox(height: 12),
-          if (practiceMinutesLeft != null)
-            Text(
-              '~$practiceMinutesLeft min practice left today',
-              style: const TextStyle(
-                color: AppColors.accentPurple,
-                fontSize: 13,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
+          const SizedBox(height: 4),
         ],
       ),
     );

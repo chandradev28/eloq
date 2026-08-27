@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('LlmRouterService Groq routing', () {
-    test('Fast mode uses Llama 4 Scout', () async {
+    test('Fast mode uses current Groq GPT-OSS 20B model', () async {
       final harness = _GroqHarness();
 
       final response = await harness.service.sendMessage(
@@ -21,23 +21,18 @@ void main() {
 
       expect(
         harness.requestedModel,
-        'meta-llama/llama-4-scout-17b-16e-instruct',
+        'openai/gpt-oss-20b',
       );
       expect(harness.lastPayload?['max_completion_tokens'], 300);
       expect(harness.lastPayload?.containsKey('max_tokens'), isFalse);
-      expect(harness.lastPayload?.containsKey('reasoning_effort'), isFalse);
-      expect(harness.lastPayload?.containsKey('include_reasoning'), isFalse);
-      expect(response.model, 'meta-llama/llama-4-scout-17b-16e-instruct');
+      expect(harness.lastPayload?['reasoning_effort'], 'low');
+      expect(harness.lastPayload?['include_reasoning'], isFalse);
+      expect(response.model, 'openai/gpt-oss-20b');
       expect(response.provider, 'groq');
     });
 
-    test('Fast mode falls back to Llama 3.1 8B when Scout is rejected',
-        () async {
-      final harness = _GroqHarness(
-        statusByModel: const {
-          'meta-llama/llama-4-scout-17b-16e-instruct': 404,
-        },
-      );
+    test('Fast mode never requests retired Groq models', () async {
+      final harness = _GroqHarness();
 
       final response = await harness.service.sendMessage(
         settings: const AppSettings(
@@ -49,14 +44,11 @@ void main() {
         userText: 'Hello',
       );
 
-      expect(harness.requestedModels, [
-        'meta-llama/llama-4-scout-17b-16e-instruct',
-        'llama-3.1-8b-instant',
-      ]);
-      expect(response.model, 'llama-3.1-8b-instant');
+      expect(harness.requestedModels, ['openai/gpt-oss-20b']);
+      expect(response.model, 'openai/gpt-oss-20b');
     });
 
-    test('Smart mode uses Llama 4 Maverick', () async {
+    test('Smart mode uses current Groq GPT-OSS 120B model', () async {
       final harness = _GroqHarness();
 
       final response = await harness.service.sendMessage(
@@ -71,18 +63,17 @@ void main() {
 
       expect(
         harness.requestedModel,
-        'meta-llama/llama-4-maverick-17b-128e-instruct',
+        'openai/gpt-oss-120b',
       );
-      expect(response.model, 'meta-llama/llama-4-maverick-17b-128e-instruct');
+      expect(harness.lastPayload?['reasoning_effort'], 'medium');
+      expect(response.model, 'openai/gpt-oss-120b');
     });
 
     test('Smart mode selects an allowed Groq fallback after a rejected model',
         () async {
       final harness = _GroqHarness(
         statusByModel: const {
-          'meta-llama/llama-4-maverick-17b-128e-instruct': 404,
-          'meta-llama/llama-4-scout-17b-16e-instruct': 404,
-          'llama-3.3-70b-versatile': 404,
+          'openai/gpt-oss-120b': 404,
         },
       );
 
@@ -96,15 +87,35 @@ void main() {
         userText: 'Hello',
       );
 
-      expect(harness.chatRequests, 4);
-      expect(harness.requestedModel, 'llama-3.1-8b-instant');
-      expect(response.model, 'llama-3.1-8b-instant');
+      expect(harness.chatRequests, 2);
+      expect(harness.requestedModel, 'openai/gpt-oss-20b');
+      expect(response.model, 'openai/gpt-oss-20b');
+    });
+
+    test('Malformed correction JSON does not discard a valid reply', () async {
+      final harness = _GroqHarness(
+        responseText: 'Good answer. |||CORRECTIONS||| not-json |||END|||',
+      );
+
+      final response = await harness.service.sendMessage(
+        settings: const AppSettings(groqApiKey: 'gsk_test'),
+        topic: Topics.byId('free_talk'),
+        history: const [],
+        userText: 'Hello',
+      );
+
+      expect(response.text, 'Good answer.');
+      expect(response.provider, 'groq');
+      expect(response.corrections, isEmpty);
     });
   });
 }
 
 class _GroqHarness {
-  _GroqHarness({this.statusByModel = const {}}) {
+  _GroqHarness({
+    this.statusByModel = const {},
+    this.responseText = 'Hello. How are you today?',
+  }) {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
@@ -140,7 +151,7 @@ class _GroqHarness {
               data: {
                 'choices': [
                   {
-                    'message': {'content': 'Hello. How are you today?'},
+                    'message': {'content': responseText},
                   },
                 ],
                 'usage': {
@@ -158,6 +169,7 @@ class _GroqHarness {
   }
 
   final Map<String, int> statusByModel;
+  final String responseText;
   final Dio dio = Dio();
   late final LlmRouterService service;
   String? requestedModel;

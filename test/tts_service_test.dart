@@ -47,4 +47,23 @@ void main() {
       );
     });
   });
+
+  group('TtsService.playbackTimeoutSeconds', () {
+    test('allows slower voices enough time to finish', () {
+      final text = List.filled(120, 'word').join(' ');
+      expect(
+        TtsService.playbackTimeoutSeconds(text, speed: 0.5),
+        greaterThan(
+          TtsService.playbackTimeoutSeconds(text, speed: 1.5),
+        ),
+      );
+    });
+
+    test('keeps a safe minimum for short replies', () {
+      expect(
+        TtsService.playbackTimeoutSeconds('Hello.', speed: 2.0),
+        12,
+      );
+    });
+  });
 }
